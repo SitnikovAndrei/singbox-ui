@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sing-Box Config Editor (описания + исправленный JSON)</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<style>
+  body { background:#f8f9fa; }
+  pre {
+    background:#f3f3f3;
+    border-radius:6px;
+    padding:10px;
+    font-family:monospace;
+    font-size:13px;
+    overflow:auto;
+    max-height:500px;
+  }
+  details summary { cursor:pointer; font-weight:500; }
+  small.text-muted { font-size: 12px; }
+</style>
+</head>
+<body class="p-3">
+<div class="container">
+  <h1 class="text-center mb-4">⚙️ Sing-Box Config Editor</h1>
+
+  <div class="d-flex justify-content-between mb-3">
+    <div>
+      <button id="loadBtn" class="btn btn-primary btn-sm">📥 Загрузить</button>
+      <button id="saveBtn" class="btn btn-success btn-sm" disabled>💾 Сохранить</button>
+    </div>
+    <div id="status" class="text-secondary small"></div>
+  </div>
+
+  <!-- Вкладки -->
+  <ul class="nav nav-tabs">
+    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabLog">Log</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabDns">DNS</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabIn">Inbounds</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabOut">Outbounds</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabRoute">Routing</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabJson">JSON</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabHelp">📘 Справка</button></li>
+  </ul>
+
+  <div class="tab-content border p-3 bg-white rounded-bottom">
+
+    <!-- LOG -->
+    <div class="tab-pane fade show active" id="tabLog">
+      <label class="form-label">Уровень логов</label>
+      <select id="logLevel" class="form-select form-select-sm w-auto" title="Определяет уровень детализации логов">
+        <option>error</option><option>warn</option><option>info</option><option>debug</option>
+      </select>
+      <small class="text-muted">`debug` — самый подробный, `error` — только ошибки</small>
+    </div>
+
+    <!-- DNS -->
+    <div class="tab-pane fade" id="tabDns">
+      <div class="row g-3 mb-2">
+        <div class="col-md-3">
+          <label class="form-label">Strategy</label>
+          <select id="dnsStrategy" class="form-select form-select-sm" title="Приоритет IPv4 или IPv6">
+            <option>prefer_ipv4</option><option>prefer_ipv6</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Final</label>
+          <input id="dnsFinal" class="form-control form-control-sm" title="DNS сервер по умолчанию (например google)" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Disable Cache</label>
+          <input type="checkbox" id="dnsNoCache" class="form-check-input ms-2" title="Отключить кэширование DNS" />
+        </div>
+      </div>
+      <h6>Серверы DNS</h6>
+      <table class="table table-sm table-striped align-middle" id="dnsTable">
+        <thead><tr><th>Address</th><th>Tag</th><th>Detour</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <button class="btn btn-outline-primary btn-sm" onclick="addDnsServer()">Добавить</button>
+    </div>
+
+    <!-- INBOUNDS -->
+    <div class="tab-pane fade" id="tabIn">
+      <table class="table table-sm table-striped align-middle" id="inTable">
+        <thead><tr><th>Type</th><th>Listen</th><th>Port</th><th>Sniff</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <button class="btn btn-outline-primary btn-sm" onclick="addInbound()">Добавить inbound</button>
+    </div>
+
+    <!-- OUTBOUNDS -->
+    <div class="tab-pane fade" id="tabOut">
+      <div id="outList"></div>
+      <button class="btn btn-outline-primary btn-sm mt-2" onclick="addOutbound()">Добавить outbound</button>
+    </div>
+
+    <!-- ROUTING -->
+    <div class="tab-pane fade" id="tabRoute">
+      <div class="mb-3">
+        <label class="form-label">Final Outbound</label>
+        <input id="routeFinal" class="form-control form-control-sm w-auto" title="Какой outbound используется по умолчанию" />
+      </div>
+      <table class="table table-sm table-striped align-middle" id="routeTable">
+        <thead><tr><th>Тип</th><th>Значения</th><th>Outbound</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="input-group w-auto mb-2">
+        <select id="routeType" class="form-select form-select-sm">
+          <option value="domain_suffix">domain_suffix</option>
+          <option value="rule_set">rule_set</option>
+          <option value="source_ip_cidr">source_ip_cidr</option>
+          <option value="ip_cidr">ip_cidr</option>
+        </select>
+        <button class="btn btn-outline-primary btn-sm" onclick="addRoute()">Добавить правило</button>
+      </div>
+    </div>
+
+    <!-- JSON -->
+    <div class="tab-pane fade" id="tabJson">
+      <button class="btn btn-outline-secondary btn-sm mb-2" onclick="updateRaw()">🔄 Обновить JSON</button>
+      <pre id="rawJson">(нет данных)</pre>
+    </div>
+
+    <!-- HELP -->
+    <div class="tab-pane fade" id="tabHelp">
+      <h5>🧭 Описание основных полей Sing-Box</h5>
+      <ul>
+        <li><b>log.level</b> — уровень логирования (debug / info / warn / error)</li>
+        <li><b>dns.servers</b> — список DNS серверов. Пример: <code>tls://8.8.8.8</code></li>
+        <li><b>inbounds</b> — входящие соединения. Например, TProxy или Socks порт</li>
+        <li><b>outbounds</b> — исходящие соединения:
+          <ul>
+            <li><b>direct</b> — напрямую</li>
+            <li><b>block</b> — блокировать</li>
+            <li><b>vless</b> — VPN-соединение, требует UUID и TLS параметров</li>
+          </ul>
+        </li>
+        <li><b>route.rules</b> — правила маршрутизации. Можно задать по IP, домену или списку.</li>
+        <li><b>tls.server_name</b> — имя хоста для проверки сертификата</li>
+        <li><b>reality.public_key</b> / <b>short_id</b> — параметры Reality TLS</li>
+      </ul>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const API_URL = "http://192.168.1.1/cgi-bin/api.uc?file=/etc/sing-box/config.json";
+let cfg = {};
+const statusEl = document.getElementById("status"), saveBtn = document.getElementById("saveBtn");
+
+// --- DNS ---
+function renderDNS() {
+  const tbody = document.querySelector("#dnsTable tbody");
+  tbody.innerHTML = "";
+  (cfg.dns?.servers || []).forEach((s, i) => {
+    tbody.insertAdjacentHTML("beforeend", `
+      <tr>
+        <td><input class="form-control form-control-sm" value="${s.address||''}"></td>
+        <td><input class="form-control form-control-sm" value="${s.tag||''}"></td>
+        <td><input class="form-control form-control-sm" value="${s.detour||''}"></td>
+        <td><button class="btn btn-sm btn-outline-danger" onclick="cfg.dns.servers.splice(${i},1);renderDNS()">✕</button></td>
+      </tr>`);
+  });
+}
+function addDnsServer(){cfg.dns.servers.push({address:"",tag:"",detour:"direct"});renderDNS();}
+
+// --- Inbounds ---
+function renderInbounds() {
+  const tbody = document.querySelector("#inTable tbody");
+  tbody.innerHTML = "";
+  (cfg.inbounds || []).forEach((inb,i)=>{
+    tbody.insertAdjacentHTML("beforeend",`
+      <tr>
+        <td><select class="form-select form-select-sm"><option ${inb.type=="tproxy"?"selected":""}>tproxy</option><option ${inb.type=="socks"?"selected":""}>socks</option></select></td>
+        <td><input class="form-control form-control-sm" value="${inb.listen||''}"></td>
+        <td><input class="form-control form-control-sm" value="${inb.listen_port||''}"></td>
+        <td class="text-center"><input type="checkbox" ${inb.sniff?"checked":""}></td>
+        <td><button class="btn btn-sm btn-outline-danger" onclick="cfg.inbounds.splice(${i},1);renderInbounds()">✕</button></td>
+      </tr>`);
+  });
+}
+function addInbound(){cfg.inbounds.push({type:"tproxy",listen:"127.0.0.1",listen_port:7890,sniff:true});renderInbounds();}
+
+// --- Outbounds (динамические поля) ---
+function renderOutbounds() {
+  const div = document.getElementById("outList");
+  div.innerHTML="";
+  (cfg.outbounds||[]).forEach((o,i)=>{
+    const card=document.createElement("div");
+    card.className="card mb-3";
+    card.innerHTML=`
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <b>${o.tag||"(no tag)"}</b>
+        <button class="btn btn-sm btn-outline-danger" onclick="cfg.outbounds.splice(${i},1);renderOutbounds()">Удалить</button>
+      </div>
+      <div class="card-body row g-2" id="out-${i}">
+        <div class="col-md-2"><input class="form-control form-control-sm tag" value="${o.tag||''}" placeholder="tag"></div>
+        <div class="col-md-2">
+          <select class="form-select form-select-sm type" onchange="toggleVless(${i},this.value)">
+            <option ${o.type=='direct'?'selected':''}>direct</option>
+            <option ${o.type=='block'?'selected':''}>block</option>
+            <option ${o.type=='vless'?'selected':''}>vless</option>
+          </select>
+        </div>
+        <div class="col-md-2"><input class="form-control form-control-sm routing_mark" value="${o.routing_mark||''}" placeholder="routing_mark"></div>
+      </div>`;
+    div.appendChild(card);
+    if(o.type==="vless") renderVlessFields(i,o);
+  });
+}
+function renderVlessFields(i, o) {
+  const parent = document.getElementById(`out-${i}`);
+  const tls = o.tls || {};
+  const utls = tls.utls || {};
+  const reality = tls.reality || {};
+
+  const block = document.createElement("div");
+  block.className = "vless-fields col-12 mt-3";
+  block.innerHTML = `
+  <details open>
+    <summary>⚙️ Параметры VLESS</summary>
+    <div class="row g-3 mt-2">
+      <div class="col-md-3">
+        <label class="form-label small mb-1" title="Адрес сервера VLESS, например ee.snowfall.top">Server</label>
+        <input class="form-control form-control-sm server" value="${o.server || ''}" placeholder="server">
+      </div>
+
+      <div class="col-md-2">
+        <label class="form-label small mb-1" title="Порт подключения к серверу (обычно 443)">Port</label>
+        <input class="form-control form-control-sm port" value="${o.server_port || 443}" placeholder="port">
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label small mb-1" title="UUID клиента — уникальный идентификатор пользователя">UUID</label>
+        <input class="form-control form-control-sm uuid" value="${o.uuid || ''}" placeholder="uuid">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label small mb-1" title="Flow — режим шифрования/обфускации (напр. xtls-rprx-vision)">Flow</label>
+        <input class="form-control form-control-sm flow" value="${o.flow || ''}" placeholder="flow">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label small mb-1" title="Тип соединения: TCP, UDP и т.п.">Network</label>
+        <input class="form-control form-control-sm network" value="${o.network || 'tcp'}" placeholder="network">
+      </div>
+
+      <hr class="mt-3 mb-1">
+
+      <div class="col-md-3">
+        <label class="form-label small mb-1" title="Имя хоста, проверяемое при TLS/Reality соединении">TLS Server Name</label>
+        <input class="form-control form-control-sm tls_server_name" value="${tls.server_name || ''}" placeholder="tls.server_name">
+      </div>
+
+      <div class="col-md-2">
+        <label class="form-label small mb-1" title="Имитация отпечатка клиента (например, Chrome, Firefox)">uTLS Fingerprint</label>
+        <input class="form-control form-control-sm fingerprint" value="${utls.fingerprint || 'chrome'}" placeholder="utls.fingerprint">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label small mb-1" title="Reality Public Key — публичный ключ сервера Reality TLS">Reality Public Key</label>
+        <input class="form-control form-control-sm pubkey" value="${reality.public_key || ''}" placeholder="reality.public_key">
+      </div>
+
+      <div class="col-md-2">
+        <label class="form-label small mb-1" title="Reality Short ID — короткий идентификатор ключа (hex строка)">Short ID</label>
+        <input class="form-control form-control-sm shortid" value="${reality.short_id || ''}" placeholder="reality.short_id">
+      </div>
+
+      <div class="col-md-2">
+        <label class="form-label small mb-1" title="Отключить проверку сертификата TLS (не рекомендуется)">Insecure</label>
+        <select class="form-select form-select-sm insecure">
+          <option value="false" ${!tls.insecure ? "selected" : ""}>false</option>
+          <option value="true" ${tls.insecure ? "selected" : ""}>true</option>
+        </select>
+      </div>
+
+      <hr class="mt-3 mb-1">
+
+      <div class="col-md-3">
+        <label class="form-label small mb-1" title="Метка маршрута, по которой трафик направляется (обычно 255)">Routing Mark</label>
+        <input class="form-control form-control-sm routing_mark" value="${o.routing_mark || 255}" placeholder="routing_mark">
+      </div>
+
+    </div>
+  </details>`;
+  parent.appendChild(block);
+}
+function toggleVless(i,type){cfg.outbounds[i].type=type;renderOutbounds();}
+function addOutbound(){
+  cfg.outbounds.push({type:"vless",tag:"new",server:"",server_port:443,uuid:"",flow:"",network:"tcp",routing_mark:255,
+    tls:{enabled:true,insecure:false,server_name:"",utls:{fingerprint:"chrome"},reality:{public_key:"",short_id:""}}});
+  renderOutbounds();
+}
+
+// --- Routing ---
+function renderRoutes(){
+  const tbody=document.querySelector("#routeTable tbody");
+  tbody.innerHTML="";
+  (cfg.route?.rules||[]).forEach((r,i)=>{
+    const type=Object.keys(r).find(k=>["domain_suffix","rule_set","ip_cidr","source_ip_cidr"].includes(k))||"domain_suffix";
+    const val=Array.isArray(r[type])?r[type].join(","):r[type];
+    tbody.insertAdjacentHTML("beforeend",`
+      <tr><td><span class="badge bg-secondary">${type}</span></td>
+      <td><input class="form-control form-control-sm" value="${val||''}"></td>
+      <td><input class="form-control form-control-sm" value="${r.outbound||''}"></td>
+      <td><button class="btn btn-sm btn-outline-danger" onclick="cfg.route.rules.splice(${i},1);renderRoutes()">✕</button></td></tr>`);
+  });
+}
+function addRoute(){const t=document.getElementById("routeType").value;const r={outbound:""};r[t]=[];cfg.route.rules.push(r);renderRoutes();}
+
+// --- Load/Save ---
+document.getElementById("loadBtn").onclick=async()=>{
+  statusEl.textContent="Загрузка...";
+  try{
+    const res=await fetch(API_URL);
+    cfg=await res.json();
+    renderDNS();renderInbounds();renderOutbounds();renderRoutes();
+    document.getElementById("logLevel").value=cfg.log?.level||"info";
+    saveBtn.disabled=false;statusEl.textContent="✅ Загружено";updateRaw();
+  }catch(e){statusEl.textContent="❌ "+e;}
+};
+document.getElementById("saveBtn").onclick = async () => {
+  statusEl.textContent = "⏳ Сохраняется...";
+
+  // === 1. Собираем значения из всех вкладок ===
+
+  // Log
+  cfg.log = { level: document.getElementById("logLevel").value };
+
+  // DNS
+  cfg.dns.strategy = document.getElementById("dnsStrategy").value;
+  cfg.dns.final = document.getElementById("dnsFinal").value;
+  cfg.dns.disable_cache = document.getElementById("dnsNoCache").checked;
+  cfg.dns.servers = Array.from(document.querySelectorAll("#dnsTable tbody tr")).map(tr => {
+    const tds = tr.querySelectorAll("input");
+    return {
+      address: tds[0].value,
+      tag: tds[1].value,
+      detour: tds[2].value
+    };
+  });
+
+  // Inbounds
+  cfg.inbounds = Array.from(document.querySelectorAll("#inTable tbody tr")).map(tr => {
+    const [typeSel, listen, port, sniff] = tr.querySelectorAll("select,input,td input[type=checkbox]");
+    return {
+      type: tr.querySelector("select").value,
+      listen: tr.querySelectorAll("input")[0].value,
+      listen_port: parseInt(tr.querySelectorAll("input")[1].value),
+      sniff: tr.querySelector("input[type=checkbox]").checked
+    };
+  });
+
+  // Outbounds (включая VLESS)
+  cfg.outbounds = [];
+  document.querySelectorAll("#outList .card").forEach(card => {
+    const base = card.querySelector(".card-body");
+    const tag = base.querySelector(".tag").value;
+    const type = base.querySelector(".type").value;
+    const routing_mark = base.querySelector(".routing_mark").value;
+
+    const outbound = { tag, type, routing_mark: parseInt(routing_mark) || 0 };
+
+    if (type === "vless") {
+      const f = base.querySelector(".vless-fields");
+      outbound.server = f.querySelector(".server").value;
+      outbound.server_port = parseInt(f.querySelector(".port").value);
+      outbound.uuid = f.querySelector(".uuid").value;
+      outbound.flow = f.querySelector(".flow").value;
+      outbound.network = f.querySelector(".network").value;
+      outbound.tls = {
+        enabled: true,
+        insecure: f.querySelector(".insecure").value === "true",
+        server_name: f.querySelector(".tls_server_name").value,
+        utls: { fingerprint: f.querySelector(".fingerprint").value },
+        reality: {
+          public_key: f.querySelector(".pubkey").value,
+          short_id: f.querySelector(".shortid").value
+        }
+      };
+    }
+
+    cfg.outbounds.push(outbound);
+  });
+
+  // Routing
+  cfg.route.final = document.getElementById("routeFinal").value;
+  cfg.route.rules = Array.from(document.querySelectorAll("#routeTable tbody tr")).map(tr => {
+    const type = tr.querySelector(".badge").textContent.trim();
+    const values = tr.querySelectorAll("input")[0].value.split(",").map(v => v.trim()).filter(Boolean);
+    const outbound = tr.querySelectorAll("input")[1].value;
+    const rule = { outbound };
+    rule[type] = values;
+    return rule;
+  });
+
+  // === 2. Обновляем JSON-просмотр ===
+  updateRaw();
+
+  // === 3. Отправляем POST ===
+  try {
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(cfg, null, 2)
+    });
+    statusEl.textContent = res.ok ? "✅ Изменения сохранены" : `❌ Ошибка ${res.status}`;
+  } catch (e) {
+    statusEl.textContent = "❌ Ошибка: " + e;
+  }
+};
+function updateRaw(){
+  document.getElementById("rawJson").textContent=JSON.stringify(cfg,null,2);
+}
+</script>
+</body>
+</html>
