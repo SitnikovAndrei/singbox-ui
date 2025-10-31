@@ -26,7 +26,7 @@
               <input type="text" class="form-control" v-model="outbound.tag" placeholder="proxy-out">
             </div>
             
-            <template v-if="outbound.type === 'vless' || outbound.type === 'vmess' || outbound.type === 'trojan'">
+            <template v-if="outbound.type === 'vless' || outbound.type === 'vmess' || outbound.type === 'trojan' || outbound.type === 'shadowsocks'">
               <div class="col-md-3">
                 <label class="form-label">Server</label>
                 <input type="text" class="form-control" v-model="outbound.server" placeholder="example.com">
@@ -60,66 +60,102 @@
             </div>
 
             <!-- TLS Configuration -->
-            <div v-if="outbound.tls" class="mt-3">
-              <h6>TLS Settings</h6>
-              <div class="row g-2">
-                <div class="col-md-3">
-                  <div class="form-check">
-                    <input class="form-check-input" type="checkbox" v-model="outbound.tls.enabled" :id="'tls-enabled-' + index">
-                    <label class="form-check-label" :for="'tls-enabled-' + index">TLS Enabled</label>
-                  </div>
-                </div>
-                <div class="col-md-3">
-                  <div class="form-check">
-                    <input class="form-check-input" type="checkbox" v-model="outbound.tls.insecure" :id="'tls-insecure-' + index">
-                    <label class="form-check-label" :for="'tls-insecure-' + index">Insecure</label>
-                  </div>
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">Server Name</label>
-                  <input type="text" class="form-control" v-model="outbound.tls.server_name" placeholder="example.com">
-                </div>
+            <div class="mt-3">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="mb-0">TLS Settings</h6>
+                <button 
+                  v-if="!outbound.tls" 
+                  class="btn btn-outline-primary btn-sm" 
+                  @click="addTlsConfig(outbound)"
+                >
+                  + Add TLS
+                </button>
               </div>
-
-              <!-- Reality Configuration -->
-              <div v-if="outbound.tls.reality" class="mt-2">
-                <h6 class="text-muted small">Reality Settings</h6>
+              
+              <div v-if="outbound.tls">
                 <div class="row g-2">
-                  <div class="col-md-4">
+                  <div class="col-md-3">
                     <div class="form-check">
-                      <input class="form-check-input" type="checkbox" v-model="outbound.tls.reality.enabled" :id="'reality-enabled-' + index">
-                      <label class="form-check-label" :for="'reality-enabled-' + index">Reality Enabled</label>
+                      <input class="form-check-input" type="checkbox" v-model="outbound.tls.enabled" :id="'tls-enabled-' + index">
+                      <label class="form-check-label" :for="'tls-enabled-' + index">TLS Enabled</label>
                     </div>
                   </div>
-                  <div class="col-md-4">
-                    <label class="form-label">Public Key</label>
-                    <input type="text" class="form-control form-control-sm" v-model="outbound.tls.reality.public_key">
-                  </div>
-                  <div class="col-md-4">
-                    <label class="form-label">Short ID</label>
-                    <input type="text" class="form-control form-control-sm" v-model="outbound.tls.reality.short_id">
-                  </div>
-                </div>
-              </div>
-
-              <!-- UTLS Configuration -->
-              <div v-if="outbound.tls.utls" class="mt-2">
-                <h6 class="text-muted small">uTLS Settings</h6>
-                <div class="row g-2">
-                  <div class="col-md-6">
+                  <div class="col-md-3">
                     <div class="form-check">
-                      <input class="form-check-input" type="checkbox" v-model="outbound.tls.utls.enabled" :id="'utls-enabled-' + index">
-                      <label class="form-check-label" :for="'utls-enabled-' + index">uTLS Enabled</label>
+                      <input class="form-check-input" type="checkbox" v-model="outbound.tls.insecure" :id="'tls-insecure-' + index">
+                      <label class="form-check-label" :for="'tls-insecure-' + index">Insecure</label>
                     </div>
                   </div>
                   <div class="col-md-6">
-                    <label class="form-label">Fingerprint</label>
-                    <select class="form-select form-select-sm" v-model="outbound.tls.utls.fingerprint">
-                      <option value="chrome">Chrome</option>
-                      <option value="firefox">Firefox</option>
-                      <option value="safari">Safari</option>
-                      <option value="edge">Edge</option>
-                    </select>
+                    <label class="form-label">Server Name</label>
+                    <input type="text" class="form-control" v-model="outbound.tls.server_name" placeholder="example.com">
+                  </div>
+                </div>
+
+                <!-- Reality Configuration -->
+                <div class="mt-2">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="text-muted small mb-0">Reality Settings</h6>
+                    <button 
+                      v-if="!outbound.tls.reality" 
+                      class="btn btn-outline-secondary btn-sm" 
+                      @click="addReality(outbound)"
+                    >
+                      + Add Reality
+                    </button>
+                  </div>
+                  
+                  <div v-if="outbound.tls.reality">
+                    <div class="row g-2">
+                      <div class="col-md-4">
+                        <div class="form-check">
+                          <input class="form-check-input" type="checkbox" v-model="outbound.tls.reality.enabled" :id="'reality-enabled-' + index">
+                          <label class="form-check-label" :for="'reality-enabled-' + index">Reality Enabled</label>
+                        </div>
+                      </div>
+                      <div class="col-md-4">
+                        <label class="form-label">Public Key</label>
+                        <input type="text" class="form-control form-control-sm" v-model="outbound.tls.reality.public_key">
+                      </div>
+                      <div class="col-md-4">
+                        <label class="form-label">Short ID</label>
+                        <input type="text" class="form-control form-control-sm" v-model="outbound.tls.reality.short_id">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- UTLS Configuration -->
+                <div class="mt-2">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="text-muted small mb-0">uTLS Settings</h6>
+                    <button 
+                      v-if="!outbound.tls.utls" 
+                      class="btn btn-outline-secondary btn-sm" 
+                      @click="addUtls(outbound)"
+                    >
+                      + Add uTLS
+                    </button>
+                  </div>
+                  
+                  <div v-if="outbound.tls.utls">
+                    <div class="row g-2">
+                      <div class="col-md-6">
+                        <div class="form-check">
+                          <input class="form-check-input" type="checkbox" v-model="outbound.tls.utls.enabled" :id="'utls-enabled-' + index">
+                          <label class="form-check-label" :for="'utls-enabled-' + index">uTLS Enabled</label>
+                        </div>
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label">Fingerprint</label>
+                        <select class="form-select form-select-sm" v-model="outbound.tls.utls.fingerprint">
+                          <option value="chrome">Chrome</option>
+                          <option value="firefox">Firefox</option>
+                          <option value="safari">Safari</option>
+                          <option value="edge">Edge</option>
+                        </select>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -161,9 +197,28 @@ export default {
 
     const addOutbound = () => {
       localOutbounds.push({
-        type: 'direct',
-        tag: 'direct',
-        routing_mark: 255
+        type: 'vless',
+        tag: 'new-outbound',
+        server: '',
+        server_port: 443,
+        uuid: '',
+        flow: 'xtls-rprx-vision',
+        network: 'tcp',
+        routing_mark: 255,
+        tls: {
+          enabled: true,
+          insecure: false,
+          server_name: '',
+          reality: {
+            enabled: false,
+            public_key: '',
+            short_id: ''
+          },
+          utls: {
+            enabled: true,
+            fingerprint: 'chrome'
+          }
+        }
       })
     }
 
@@ -171,10 +226,42 @@ export default {
       localOutbounds.splice(index, 1)
     }
 
+    const addTlsConfig = (outbound) => {
+      outbound.tls = {
+        enabled: true,
+        insecure: false,
+        server_name: ''
+      }
+    }
+
+    const addReality = (outbound) => {
+      if (!outbound.tls) {
+        addTlsConfig(outbound)
+      }
+      outbound.tls.reality = {
+        enabled: true,
+        public_key: '',
+        short_id: ''
+      }
+    }
+
+    const addUtls = (outbound) => {
+      if (!outbound.tls) {
+        addTlsConfig(outbound)
+      }
+      outbound.tls.utls = {
+        enabled: true,
+        fingerprint: 'chrome'
+      }
+    }
+
     return {
       localOutbounds,
       addOutbound,
-      removeOutbound
+      removeOutbound,
+      addTlsConfig,
+      addReality,
+      addUtls
     }
   }
 }
