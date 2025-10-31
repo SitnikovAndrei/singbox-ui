@@ -1,24 +1,32 @@
 <template>
   <div class="card">
-    <div class="card-body">
-      <h5 class="card-title">DNS Configuration</h5>
-      
-      <div class="row mb-3">
-        <div class="col-md-4">
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" v-model="localDns.disable_cache" id="disableCache">
-            <label class="form-check-label" for="disableCache">Disable Cache</label>
-          </div>
+    <div class="card-header">
+      <h2 class="text-xl font-semibold">DNS Configuration</h2>
+    </div>
+    <div class="card-body space-y-6">
+      <!-- Basic Settings -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="flex items-center">
+          <input
+            type="checkbox"
+            v-model="localDns.disable_cache"
+            id="disableCache"
+            class="form-checkbox"
+          />
+          <label for="disableCache" class="ml-2 text-sm text-gray-700">Disable Cache</label>
         </div>
-        <div class="col-md-4">
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" v-model="localDns.disable_expire" id="disableExpire">
-            <label class="form-check-label" for="disableExpire">Disable Expire</label>
-          </div>
+        <div class="flex items-center">
+          <input
+            type="checkbox"
+            v-model="localDns.disable_expire"
+            id="disableExpire"
+            class="form-checkbox"
+          />
+          <label for="disableExpire" class="ml-2 text-sm text-gray-700">Disable Expire</label>
         </div>
-        <div class="col-md-4">
+        <div>
           <label class="form-label">Strategy</label>
-          <select class="form-select" v-model="localDns.strategy">
+          <select v-model="localDns.strategy" class="form-select">
             <option value="prefer_ipv4">Prefer IPv4</option>
             <option value="prefer_ipv6">Prefer IPv6</option>
             <option value="ipv4_only">IPv4 Only</option>
@@ -27,34 +35,69 @@
         </div>
       </div>
 
-      <div class="mb-3">
+      <div class="w-full md:w-1/2">
         <label class="form-label">Final DNS</label>
-        <input type="text" class="form-control" v-model="localDns.final">
+        <input type="text" v-model="localDns.final" class="form-input">
       </div>
 
-      <h6 class="mt-4">DNS Servers</h6>
-      <div v-for="(server, index) in localDns.servers" :key="index" class="card mb-2">
-        <div class="card-body">
-          <div class="row g-2">
-            <div class="col-md-4">
-              <label class="form-label">Address</label>
-              <input type="text" class="form-control" v-model="server.address" placeholder="tls://8.8.8.8">
-            </div>
-            <div class="col-md-3">
-              <label class="form-label">Tag</label>
-              <input type="text" class="form-control" v-model="server.tag" placeholder="google">
-            </div>
-            <div class="col-md-3">
-              <label class="form-label">Detour</label>
-              <input type="text" class="form-control" v-model="server.detour" placeholder="direct">
-            </div>
-            <div class="col-md-2 d-flex align-items-end">
-              <button class="btn btn-danger btn-sm w-100" @click="removeServer(index)">Remove</button>
+      <!-- DNS Servers -->
+      <div>
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-medium text-gray-900">DNS Servers</h3>
+          <button @click="addServer" class="btn btn-success btn-sm">
+            + Add DNS Server
+          </button>
+        </div>
+
+        <div class="space-y-3">
+          <div
+            v-for="(server, index) in localDns.servers"
+            :key="index"
+            class="bg-gray-50 border border-gray-200 rounded-lg p-4"
+          >
+            <div class="flex items-start gap-4">
+              <div class="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label class="form-label">Address</label>
+                  <input
+                    type="text"
+                    v-model="server.address"
+                    class="form-input"
+                    placeholder="tls://8.8.8.8"
+                  />
+                </div>
+                <div>
+                  <label class="form-label">Tag</label>
+                  <input
+                    type="text"
+                    v-model="server.tag"
+                    class="form-input"
+                    placeholder="google"
+                  />
+                </div>
+                <div>
+                  <label class="form-label">Detour</label>
+                  <input
+                    type="text"
+                    v-model="server.detour"
+                    class="form-input"
+                    placeholder="direct"
+                  />
+                </div>
+              </div>
+              <button
+                @click="removeServer(index)"
+                class="mt-6 p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                title="Remove"
+              >
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                </svg>
+              </button>
             </div>
           </div>
         </div>
       </div>
-      <button class="btn btn-success btn-sm" @click="addServer">+ Add DNS Server</button>
     </div>
   </div>
 </template>

@@ -1,68 +1,73 @@
 <template>
-  <div class="container-fluid py-4">
-    <header class="mb-4">
-      <h1 class="h3">Sing-Box Configuration Editor</h1>
-    </header>
+  <div class="min-h-screen bg-gray-50 py-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <header class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900">Sing-Box Configuration Editor</h1>
+      </header>
 
-    <div v-if="error" class="alert alert-danger alert-dismissible fade show" role="alert">
-      {{ error }}
-      <button type="button" class="btn-close" @click="error = null"></button>
-    </div>
-
-    <div v-if="success" class="alert alert-success alert-dismissible fade show" role="alert">
-      {{ success }}
-      <button type="button" class="btn-close" @click="success = null"></button>
-    </div>
-
-    <div v-if="loading" class="text-center my-5">
-      <div class="spinner-border" role="status">
-        <span class="visually-hidden">Loading...</span>
-      </div>
-    </div>
-
-    <div v-else-if="config">
-      <ul class="nav nav-tabs mb-3" role="tablist">
-        <li class="nav-item" role="presentation">
-          <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#dns-tab">DNS</button>
-        </li>
-        <li class="nav-item" role="presentation">
-          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#inbounds-tab">Inbounds</button>
-        </li>
-        <li class="nav-item" role="presentation">
-          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#outbounds-tab">Outbounds</button>
-        </li>
-        <li class="nav-item" role="presentation">
-          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#routes-tab">Routes</button>
-        </li>
-        <li class="nav-item" role="presentation">
-          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#log-tab">Log</button>
-        </li>
-      </ul>
-
-      <div class="tab-content">
-        <div class="tab-pane fade show active" id="dns-tab">
-          <dns-config :dns="config.dns" @update="updateDns" />
-        </div>
-        <div class="tab-pane fade" id="inbounds-tab">
-          <inbounds-config :inbounds="config.inbounds" @update="updateInbounds" />
-        </div>
-        <div class="tab-pane fade" id="outbounds-tab">
-          <outbounds-config :outbounds="config.outbounds" @update="updateOutbounds" />
-        </div>
-        <div class="tab-pane fade" id="routes-tab">
-          <routes-config :route="config.route" @update="updateRoute" />
-        </div>
-        <div class="tab-pane fade" id="log-tab">
-          <log-config :log="config.log" @update="updateLog" />
+      <div v-if="error" class="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-md">
+        <div class="flex items-center justify-between">
+          <p class="text-red-800">{{ error }}</p>
+          <button @click="error = null" class="text-red-500 hover:text-red-700">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+            </svg>
+          </button>
         </div>
       </div>
 
-      <div class="mt-4 d-flex gap-2">
-        <button class="btn btn-primary" @click="saveConfig" :disabled="saving">
-          <span v-if="saving" class="spinner-border spinner-border-sm me-2"></span>
-          Save Configuration
-        </button>
-        <button class="btn btn-secondary" @click="loadConfig">Reload</button>
+      <div v-if="success" class="mb-6 bg-green-50 border-l-4 border-green-500 p-4 rounded-md">
+        <div class="flex items-center justify-between">
+          <p class="text-green-800">{{ success }}</p>
+          <button @click="success = null" class="text-green-500 hover:text-green-700">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div v-if="loading" class="flex justify-center items-center py-20">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+
+      <div v-else-if="config">
+        <!-- Tabs -->
+        <div class="border-b border-gray-200 mb-6">
+          <nav class="-mb-px flex space-x-8">
+            <button
+              v-for="tab in tabs"
+              :key="tab.id"
+              @click="activeTab = tab.id"
+              :class="[
+                activeTab === tab.id
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
+                'whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors'
+              ]"
+            >
+              {{ tab.name }}
+            </button>
+          </nav>
+        </div>
+
+        <!-- Tab Content -->
+        <div class="space-y-6">
+          <dns-config v-show="activeTab === 'dns'" :dns="config.dns" @update="updateDns" />
+          <inbounds-config v-show="activeTab === 'inbounds'" :inbounds="config.inbounds" @update="updateInbounds" />
+          <outbounds-config v-show="activeTab === 'outbounds'" :outbounds="config.outbounds" @update="updateOutbounds" />
+          <rule-sets-config v-show="activeTab === 'rule-sets'" :rule-sets="config.route?.rule_set || []" @update="updateRuleSets" />
+          <routes-config v-show="activeTab === 'routes'" :route="config.route" @update="updateRoute" />
+          <log-config v-show="activeTab === 'log'" :log="config.log" @update="updateLog" />
+        </div>
+
+        <div class="mt-8 flex gap-4">
+          <button @click="saveConfig" :disabled="saving" class="btn btn-primary">
+            <span v-if="saving" class="inline-block animate-spin mr-2">⟳</span>
+            Save Configuration
+          </button>
+          <button @click="loadConfig" class="btn btn-secondary">Reload</button>
+        </div>
       </div>
     </div>
   </div>
@@ -74,6 +79,7 @@ import { ConfigService } from './services/ConfigService'
 import DnsConfig from './components/DnsConfig.vue'
 import InboundsConfig from './components/InboundsConfig.vue'
 import OutboundsConfig from './components/OutboundsConfig.vue'
+import RuleSetsConfig from './components/RuleSetsConfig.vue'
 import RoutesConfig from './components/RoutesConfig.vue'
 import LogConfig from './components/LogConfig.vue'
 
@@ -83,6 +89,7 @@ export default {
     DnsConfig,
     InboundsConfig,
     OutboundsConfig,
+    RuleSetsConfig,
     RoutesConfig,
     LogConfig
   },
@@ -92,7 +99,17 @@ export default {
     const saving = ref(false)
     const error = ref(null)
     const success = ref(null)
+    const activeTab = ref('dns')
     const configService = new ConfigService()
+
+    const tabs = [
+      { id: 'dns', name: 'DNS' },
+      { id: 'inbounds', name: 'Inbounds' },
+      { id: 'outbounds', name: 'Outbounds' },
+      { id: 'rule-sets', name: 'Rule Sets' },
+      { id: 'routes', name: 'Routes' },
+      { id: 'log', name: 'Log' }
+    ]
 
     const loadConfig = async () => {
       loading.value = true
@@ -132,6 +149,13 @@ export default {
       config.value.outbounds = outbounds
     }
 
+    const updateRuleSets = (ruleSets) => {
+      if (!config.value.route) {
+        config.value.route = {}
+      }
+      config.value.route.rule_set = ruleSets
+    }
+
     const updateRoute = (route) => {
       config.value.route = route
     }
@@ -150,11 +174,14 @@ export default {
       saving,
       error,
       success,
+      activeTab,
+      tabs,
       loadConfig,
       saveConfig,
       updateDns,
       updateInbounds,
       updateOutbounds,
+      updateRuleSets,
       updateRoute,
       updateLog
     }

@@ -1,12 +1,13 @@
 <template>
   <div class="card">
+    <div class="card-header">
+      <h2 class="text-xl font-semibold">Log Configuration</h2>
+    </div>
     <div class="card-body">
-      <h5 class="card-title">Log Configuration</h5>
-      
-      <div class="row">
-        <div class="col-md-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
           <label class="form-label">Log Level</label>
-          <select class="form-select" v-model="localLog.level">
+          <select v-model="localLog.level" class="form-select">
             <option value="trace">Trace</option>
             <option value="debug">Debug</option>
             <option value="info">Info</option>
@@ -15,25 +16,35 @@
             <option value="fatal">Fatal</option>
             <option value="panic">Panic</option>
           </select>
-          <div class="form-text">
-            <strong>Debug</strong> - максимальная детализация для отладки<br>
-            <strong>Info</strong> - стандартный уровень логирования<br>
-            <strong>Error</strong> - только ошибки
-          </div>
+          <p class="mt-2 text-sm text-gray-500">
+            <strong>Debug:</strong> максимальная детализация для отладки<br>
+            <strong>Info:</strong> стандартный уровень логирования<br>
+            <strong>Error:</strong> только ошибки
+          </p>
         </div>
-        <div class="col-md-6">
+        <div>
           <label class="form-label">Output (optional)</label>
-          <input type="text" class="form-control" v-model="localLog.output" placeholder="/var/log/sing-box.log">
-          <div class="form-text">Путь к файлу логов. Оставьте пустым для вывода в stdout</div>
+          <input
+            type="text"
+            v-model="localLog.output"
+            class="form-input"
+            placeholder="/var/log/sing-box.log"
+          />
+          <p class="mt-2 text-sm text-gray-500">
+            Путь к файлу логов. Оставьте пустым для вывода в stdout
+          </p>
         </div>
       </div>
 
-      <div class="row mt-3">
-        <div class="col-md-6">
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" v-model="localLog.timestamp" id="logTimestamp">
-            <label class="form-check-label" for="logTimestamp">Include Timestamp</label>
-          </div>
+      <div class="mt-4">
+        <div class="flex items-center">
+          <input
+            type="checkbox"
+            v-model="localLog.timestamp"
+            id="logTimestamp"
+            class="form-checkbox"
+          />
+          <label for="logTimestamp" class="ml-2 text-sm text-gray-700">Include Timestamp</label>
         </div>
       </div>
     </div>

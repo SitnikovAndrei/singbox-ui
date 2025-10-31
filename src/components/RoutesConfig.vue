@@ -1,120 +1,178 @@
 <template>
   <div class="card">
-    <div class="card-body">
-      <h5 class="card-title">Route Configuration</h5>
-
-      <div class="row mb-3">
-        <div class="col-md-6">
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" v-model="localRoute.auto_detect_interface" id="autoDetect">
-            <label class="form-check-label" for="autoDetect">Auto Detect Interface</label>
-          </div>
+    <div class="card-header">
+      <h2 class="text-xl font-semibold">Routing Rules</h2>
+    </div>
+    <div class="card-body space-y-6">
+      <!-- Basic Settings -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="flex items-center">
+          <input
+            type="checkbox"
+            v-model="localRoute.auto_detect_interface"
+            id="autoDetect"
+            class="form-checkbox"
+          />
+          <label for="autoDetect" class="ml-2 text-sm text-gray-700">Auto Detect Interface</label>
         </div>
-        <div class="col-md-6">
+        <div>
           <label class="form-label">Final Outbound</label>
-          <input type="text" class="form-control" v-model="localRoute.final" placeholder="direct">
+          <input type="text" v-model="localRoute.final" class="form-input" placeholder="direct">
         </div>
       </div>
 
-      <h6 class="mt-4">Rule Sets</h6>
-      <div v-for="(ruleSet, index) in localRoute.rule_set" :key="index" class="card mb-2">
-        <div class="card-body">
-          <div class="row g-2">
-            <div class="col-md-4">
-              <label class="form-label">Tag</label>
-              <input type="text" class="form-control" v-model="ruleSet.tag" placeholder="openai">
-            </div>
-            <div class="col-md-3">
-              <label class="form-label">Type</label>
-              <select class="form-select" v-model="ruleSet.type">
-                <option value="remote">Remote</option>
-                <option value="local">Local</option>
-              </select>
-            </div>
-            <div class="col-md-3">
-              <label class="form-label">Format</label>
-              <select class="form-select" v-model="ruleSet.format">
-                <option value="binary">Binary</option>
-                <option value="json">JSON</option>
-              </select>
-            </div>
-            <div class="col-md-2 d-flex align-items-end">
-              <button class="btn btn-danger btn-sm w-100" @click="removeRuleSet(index)">Remove</button>
-            </div>
-          </div>
-          <div class="row g-2 mt-2" v-if="ruleSet.type === 'remote'">
-            <div class="col-md-12">
-              <label class="form-label">URL</label>
-              <input type="text" class="form-control" v-model="ruleSet.url" placeholder="https://...">
-            </div>
-          </div>
+      <!-- Routing Rules -->
+      <div>
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-medium text-gray-900">Rules</h3>
+          <button @click="addRule" class="btn btn-success btn-sm">
+            + Add Rule
+          </button>
         </div>
-      </div>
-      <button class="btn btn-success btn-sm" @click="addRuleSet">+ Add Rule Set</button>
 
-      <h6 class="mt-4">Routing Rules</h6>
-      <div v-for="(rule, index) in localRoute.rules" :key="index" class="card mb-2">
-        <div class="card-body">
-          <div class="row g-2">
-            <div class="col-md-4">
-              <label class="form-label">Outbound</label>
-              <input type="text" class="form-control" v-model="rule.outbound" placeholder="direct">
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">Rule Set</label>
-              <input type="text" class="form-control" v-model="rule.rule_set" placeholder="openai">
-            </div>
-            <div class="col-md-4 d-flex align-items-end">
-              <button class="btn btn-danger btn-sm w-100" @click="removeRule(index)">Remove</button>
-            </div>
-          </div>
-          
-          <!-- Domain Suffix -->
-          <div class="mt-2" v-if="rule.domain_suffix">
-            <label class="form-label">Domain Suffixes</label>
-            <div v-for="(domain, dIndex) in rule.domain_suffix" :key="dIndex" class="input-group mb-1">
-              <input type="text" class="form-control form-control-sm" v-model="rule.domain_suffix[dIndex]" placeholder="example.com">
-              <button class="btn btn-outline-danger btn-sm" @click="removeDomain(rule, dIndex)">×</button>
-            </div>
-            <button class="btn btn-outline-success btn-sm" @click="addDomain(rule)">+ Add Domain</button>
-          </div>
+        <div v-if="!localRoute.rules || localRoute.rules.length === 0" class="text-center py-12 text-gray-500 border border-dashed border-gray-300 rounded-lg">
+          No routing rules configured. Click "+ Add Rule" to create one.
+        </div>
 
-          <!-- Source IP CIDR -->
-          <div class="mt-2" v-if="rule.source_ip_cidr">
-            <label class="form-label">Source IP CIDR</label>
-            <div v-for="(ip, ipIndex) in rule.source_ip_cidr" :key="ipIndex" class="input-group mb-1">
-              <input type="text" class="form-control form-control-sm" v-model="rule.source_ip_cidr[ipIndex]" placeholder="192.168.1.0/24">
-              <button class="btn btn-outline-danger btn-sm" @click="removeSourceIp(rule, ipIndex)">×</button>
+        <div v-else class="space-y-3">
+          <div
+            v-for="(rule, index) in localRoute.rules"
+            :key="index"
+            class="border border-gray-200 rounded-lg p-4 space-y-4 hover:border-blue-300 transition-colors"
+          >
+            <div class="flex items-start gap-4">
+              <div class="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="form-label">Outbound</label>
+                  <input type="text" v-model="rule.outbound" class="form-input" placeholder="direct">
+                </div>
+                <div>
+                  <label class="form-label">Rule Set</label>
+                  <input type="text" v-model="rule.rule_set" class="form-input" placeholder="openai">
+                </div>
+              </div>
+              <button
+                @click="removeRule(index)"
+                class="mt-6 p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                title="Remove"
+              >
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                </svg>
+              </button>
             </div>
-            <button class="btn btn-outline-success btn-sm" @click="addSourceIp(rule)">+ Add IP</button>
-          </div>
 
-          <!-- IP CIDR -->
-          <div class="mt-2" v-if="rule.ip_cidr">
-            <label class="form-label">IP CIDR</label>
-            <div v-for="(ip, ipIndex) in rule.ip_cidr" :key="ipIndex" class="input-group mb-1">
-              <input type="text" class="form-control form-control-sm" v-model="rule.ip_cidr[ipIndex]" placeholder="160.79.104.0/23">
-              <button class="btn btn-outline-danger btn-sm" @click="removeIpCidr(rule, ipIndex)">×</button>
-            </div>
-            <button class="btn btn-outline-success btn-sm" @click="addIpCidr(rule)">+ Add IP CIDR</button>
-          </div>
-
-          <div class="mt-2">
-            <div class="btn-group btn-group-sm" role="group">
-              <button class="btn btn-outline-primary" @click="toggleRuleField(rule, 'domain_suffix')">
+            <!-- Additional Fields -->
+            <div class="flex gap-2">
+              <button
+                @click="toggleRuleField(rule, 'domain_suffix')"
+                :class="[
+                  'px-3 py-1 text-sm rounded-md transition-colors',
+                  rule.domain_suffix
+                    ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                ]"
+              >
                 {{ rule.domain_suffix ? '✓' : '+' }} Domains
               </button>
-              <button class="btn btn-outline-primary" @click="toggleRuleField(rule, 'source_ip_cidr')">
+              <button
+                @click="toggleRuleField(rule, 'source_ip_cidr')"
+                :class="[
+                  'px-3 py-1 text-sm rounded-md transition-colors',
+                  rule.source_ip_cidr
+                    ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                ]"
+              >
                 {{ rule.source_ip_cidr ? '✓' : '+' }} Source IPs
               </button>
-              <button class="btn btn-outline-primary" @click="toggleRuleField(rule, 'ip_cidr')">
+              <button
+                @click="toggleRuleField(rule, 'ip_cidr')"
+                :class="[
+                  'px-3 py-1 text-sm rounded-md transition-colors',
+                  rule.ip_cidr
+                    ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                ]"
+              >
                 {{ rule.ip_cidr ? '✓' : '+' }} IP CIDRs
               </button>
             </div>
+
+            <!-- Domain Suffix -->
+            <div v-if="rule.domain_suffix" class="pl-4 border-l-2 border-blue-200">
+              <label class="form-label">Domain Suffixes</label>
+              <div class="space-y-2">
+                <div v-for="(domain, dIndex) in rule.domain_suffix" :key="dIndex" class="flex gap-2">
+                  <input
+                    type="text"
+                    v-model="rule.domain_suffix[dIndex]"
+                    class="form-input flex-1"
+                    placeholder="example.com"
+                  />
+                  <button
+                    @click="removeDomain(rule, dIndex)"
+                    class="px-3 py-2 text-red-600 hover:bg-red-50 rounded-md"
+                  >
+                    ×
+                  </button>
+                </div>
+                <button @click="addDomain(rule)" class="text-sm text-blue-600 hover:text-blue-700">
+                  + Add Domain
+                </button>
+              </div>
+            </div>
+
+            <!-- Source IP CIDR -->
+            <div v-if="rule.source_ip_cidr" class="pl-4 border-l-2 border-green-200">
+              <label class="form-label">Source IP CIDR</label>
+              <div class="space-y-2">
+                <div v-for="(ip, ipIndex) in rule.source_ip_cidr" :key="ipIndex" class="flex gap-2">
+                  <input
+                    type="text"
+                    v-model="rule.source_ip_cidr[ipIndex]"
+                    class="form-input flex-1"
+                    placeholder="192.168.1.0/24"
+                  />
+                  <button
+                    @click="removeSourceIp(rule, ipIndex)"
+                    class="px-3 py-2 text-red-600 hover:bg-red-50 rounded-md"
+                  >
+                    ×
+                  </button>
+                </div>
+                <button @click="addSourceIp(rule)" class="text-sm text-blue-600 hover:text-blue-700">
+                  + Add IP
+                </button>
+              </div>
+            </div>
+
+            <!-- IP CIDR -->
+            <div v-if="rule.ip_cidr" class="pl-4 border-l-2 border-purple-200">
+              <label class="form-label">IP CIDR</label>
+              <div class="space-y-2">
+                <div v-for="(ip, ipIndex) in rule.ip_cidr" :key="ipIndex" class="flex gap-2">
+                  <input
+                    type="text"
+                    v-model="rule.ip_cidr[ipIndex]"
+                    class="form-input flex-1"
+                    placeholder="160.79.104.0/23"
+                  />
+                  <button
+                    @click="removeIpCidr(rule, ipIndex)"
+                    class="px-3 py-2 text-red-600 hover:bg-red-50 rounded-md"
+                  >
+                    ×
+                  </button>
+                </div>
+                <button @click="addIpCidr(rule)" class="text-sm text-blue-600 hover:text-blue-700">
+                  + Add IP CIDR
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-      <button class="btn btn-success btn-sm" @click="addRule">+ Add Rule</button>
     </div>
   </div>
 </template>
@@ -137,22 +195,6 @@ export default {
     watch(localRoute, (newVal) => {
       emit('update', { ...newVal })
     }, { deep: true })
-
-    const addRuleSet = () => {
-      if (!localRoute.rule_set) {
-        localRoute.rule_set = []
-      }
-      localRoute.rule_set.push({
-        tag: '',
-        type: 'remote',
-        format: 'binary',
-        url: ''
-      })
-    }
-
-    const removeRuleSet = (index) => {
-      localRoute.rule_set.splice(index, 1)
-    }
 
     const addRule = () => {
       if (!localRoute.rules) {
@@ -214,8 +256,6 @@ export default {
 
     return {
       localRoute,
-      addRuleSet,
-      removeRuleSet,
       addRule,
       removeRule,
       toggleRuleField,
