@@ -89,7 +89,7 @@ export default {
     }, { deep: true })
 
     const addRuleSet = () => {
-      localRuleSets.push({
+      localRuleSets.unshift({
         tag: '',
         type: 'remote',
         format: 'binary',

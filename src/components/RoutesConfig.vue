@@ -241,7 +241,7 @@ export default {
       if (!localRoute.rules) {
         localRoute.rules = []
       }
-      localRoute.rules.push({
+      localRoute.rules.unshift({
         outbound: ''
       })
     }

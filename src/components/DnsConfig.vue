@@ -125,7 +125,7 @@ export default {
       if (!localDns.servers) {
         localDns.servers = []
       }
-      localDns.servers.push({
+      localDns.servers.unshift({
         address: '',
         tag: '',
         detour: 'direct'

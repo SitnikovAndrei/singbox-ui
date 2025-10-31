@@ -151,8 +151,8 @@ export default {
     }, { deep: true })
 
     const addInbound = () => {
-      const newIndex = localInbounds.length
-      localInbounds.push({
+      const newIndex = 0
+      localInbounds.unshift({
         type: 'mixed',
         tag: 'mixed-in',
         listen: '127.0.0.1',

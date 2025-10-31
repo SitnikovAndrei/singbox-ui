@@ -1,9 +1,6 @@
 <template>
   <div class="min-h-screen bg-gray-50 py-8">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <header class="mb-8">
-        <h1 class="text-3xl font-bold text-gray-900">Sing-Box Configuration Editor</h1>
-      </header>
 
       <div v-if="error" class="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-md">
         <div class="flex items-center justify-between">
@@ -32,8 +29,22 @@
       </div>
 
       <div v-else-if="config">
-        <!-- Tabs -->
-        <div class="border-b border-gray-200 mb-6">
+        <!-- Mobile Dropdown -->
+        <div class="md:hidden mb-6">
+          <label for="mobile-tabs" class="sr-only">Select a tab</label>
+          <select
+            id="mobile-tabs"
+            v-model="activeTab"
+            class="block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+          >
+            <option v-for="tab in tabs" :key="tab.id" :value="tab.id">
+              {{ tab.name }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Desktop Tabs -->
+        <div class="hidden md:block border-b border-gray-200 mb-6">
           <nav class="-mb-px flex space-x-8">
             <button
               v-for="tab in tabs"
@@ -67,12 +78,12 @@
           <log-config v-show="activeTab === 'log'" :log="config.log" @update="updateLog" />
         </div>
 
-        <div class="mt-8 flex gap-4">
-          <button @click="saveConfig" :disabled="saving" class="btn btn-primary">
+        <div class="mt-8 flex flex-col sm:flex-row gap-4">
+          <button @click="saveConfig" :disabled="saving" class="btn btn-primary w-full sm:w-auto">
             <span v-if="saving" class="inline-block animate-spin mr-2">⟳</span>
             Save Configuration
           </button>
-          <button @click="loadConfig" class="btn btn-secondary">Reload</button>
+          <button @click="loadConfig" class="btn btn-secondary w-full sm:w-auto">Reload</button>
         </div>
       </div>
     </div>

@@ -225,6 +225,60 @@
             </template>
 
             <!-- Routing Mark -->
+
+          <!-- Shadowsocks Specific -->
+          <template v-if="outbound.type === 'shadowsocks'">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="form-label">Method</label>
+                <select v-model="outbound.method" class="form-select">
+                  <option value="2022-blake3-aes-128-gcm">2022-blake3-aes-128-gcm</option>
+                  <option value="2022-blake3-aes-256-gcm">2022-blake3-aes-256-gcm</option>
+                  <option value="2022-blake3-chacha20-poly1305">2022-blake3-chacha20-poly1305</option>
+                  <option value="none">none</option>
+                  <option value="aes-128-gcm">aes-128-gcm</option>
+                  <option value="aes-192-gcm">aes-192-gcm</option>
+                  <option value="aes-256-gcm">aes-256-gcm</option>
+                  <option value="chacha20-ietf-poly1305">chacha20-ietf-poly1305</option>
+                  <option value="xchacha20-ietf-poly1305">xchacha20-ietf-poly1305</option>
+                </select>
+              </div>
+              <div>
+                <label class="form-label">Password</label>
+                <input type="text" v-model="outbound.password" class="form-input" placeholder="8JCsPssfgS8tiRwiMlhARg==">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+              <div>
+                <label class="form-label">Network</label>
+                <select v-model="outbound.network" class="form-select">
+                  <option value="tcp">TCP</option>
+                  <option value="udp">UDP</option>
+                </select>
+              </div>
+              <div>
+                <label class="form-label">Plugin (optional)</label>
+                <input type="text" v-model="outbound.plugin" class="form-input" placeholder="obfs-local">
+              </div>
+              <div>
+                <label class="form-label">Plugin Options (optional)</label>
+                <input type="text" v-model="outbound.plugin_opts" class="form-input" placeholder="obfs=http">
+              </div>
+            </div>
+
+            <div class="mt-4">
+              <div class="flex items-center">
+                <input
+                  type="checkbox"
+                  v-model="outbound.udp_over_tcp"
+                  :id="'udp-over-tcp-' + index"
+                  class="form-checkbox"
+                />
+                <label :for="'udp-over-tcp-' + index" class="ml-2 text-sm text-gray-700">UDP over TCP</label>
+              </div>
+            </div>
+          </template>
             <div v-if="outbound.routing_mark !== undefined" class="border-t pt-4">
               <div class="w-full md:w-1/3">
                 <label class="form-label">Routing Mark</label>
@@ -259,30 +313,19 @@ export default {
     }, { deep: true })
 
     const addOutbound = () => {
-      const newIndex = localOutbounds.length
-      localOutbounds.push({
-        type: 'vless',
+      const newIndex = 0
+      localOutbounds.unshift({
+        type: 'shadowsocks',
         tag: 'new-outbound',
         server: '',
-        server_port: 443,
-        uuid: '',
-        flow: 'xtls-rprx-vision',
+        server_port: 1080,
+        method: '2022-blake3-aes-128-gcm',
+        password: '',
+        plugin: '',
+        plugin_opts: '',
         network: 'tcp',
-        routing_mark: 255,
-        tls: {
-          enabled: true,
-          insecure: false,
-          server_name: '',
-          reality: {
-            enabled: false,
-            public_key: '',
-            short_id: ''
-          },
-          utls: {
-            enabled: true,
-            fingerprint: 'chrome'
-          }
-        }
+        udp_over_tcp: false,
+        routing_mark: 255
       })
       expandedItems.value[newIndex] = true
     }
