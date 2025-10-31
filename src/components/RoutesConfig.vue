@@ -44,11 +44,12 @@
               <div class="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label class="form-label">Outbound</label>
-                  <input type="text" v-model="rule.outbound" class="form-input" placeholder="direct">
-                </div>
-                <div>
-                  <label class="form-label">Rule Set</label>
-                  <input type="text" v-model="rule.rule_set" class="form-input" placeholder="openai">
+                  <select v-model="rule.outbound" class="form-select">
+                    <option value="">-- Select Outbound --</option>
+                    <option v-for="tag in outboundTags" :key="tag" :value="tag">
+                      {{ tag }}
+                    </option>
+                  </select>
                 </div>
               </div>
               <button
@@ -63,7 +64,18 @@
             </div>
 
             <!-- Additional Fields -->
-            <div class="flex gap-2">
+            <div class="flex gap-2 flex-wrap">
+              <button
+                @click="toggleRuleField(rule, 'rule_set')"
+                :class="[
+                  'px-3 py-1 text-sm rounded-md transition-colors',
+                  rule.rule_set !== undefined
+                    ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                ]"
+              >
+                {{ rule.rule_set !== undefined ? '✓' : '+' }} Rule Set
+              </button>
               <button
                 @click="toggleRuleField(rule, 'domain_suffix')"
                 :class="[
@@ -97,6 +109,17 @@
               >
                 {{ rule.ip_cidr ? '✓' : '+' }} IP CIDRs
               </button>
+            </div>
+
+            <!-- Rule Set -->
+            <div v-if="rule.rule_set !== undefined" class="pl-4 border-l-2 border-indigo-200">
+              <label class="form-label">Rule Set</label>
+              <select v-model="rule.rule_set" class="form-select">
+                <option value="">-- Select Rule Set --</option>
+                <option v-for="tag in ruleSetTags" :key="tag" :value="tag">
+                  {{ tag }}
+                </option>
+              </select>
             </div>
 
             <!-- Domain Suffix -->
@@ -178,7 +201,7 @@
 </template>
 
 <script>
-import { reactive, watch } from 'vue'
+import { reactive, computed, watch } from 'vue'
 
 export default {
   name: 'RoutesConfig',
@@ -186,11 +209,29 @@ export default {
     route: {
       type: Object,
       required: true
+    },
+    outbounds: {
+      type: Array,
+      default: () => []
+    },
+    ruleSets: {
+      type: Array,
+      default: () => []
     }
   },
   emits: ['update'],
   setup(props, { emit }) {
     const localRoute = reactive({ ...props.route })
+
+    // Extract outbound tags
+    const outboundTags = computed(() => {
+      return props.outbounds.map(ob => ob.tag).filter(tag => tag)
+    })
+
+    // Extract rule set tags
+    const ruleSetTags = computed(() => {
+      return props.ruleSets.map(rs => rs.tag).filter(tag => tag)
+    })
 
     watch(localRoute, (newVal) => {
       emit('update', { ...newVal })
@@ -201,8 +242,7 @@ export default {
         localRoute.rules = []
       }
       localRoute.rules.push({
-        outbound: '',
-        rule_set: ''
+        outbound: ''
       })
     }
 
@@ -211,10 +251,18 @@ export default {
     }
 
     const toggleRuleField = (rule, field) => {
-      if (rule[field]) {
-        delete rule[field]
+      if (field === 'rule_set') {
+        if (rule.rule_set !== undefined) {
+          delete rule.rule_set
+        } else {
+          rule.rule_set = ''
+        }
       } else {
-        rule[field] = []
+        if (rule[field]) {
+          delete rule[field]
+        } else {
+          rule[field] = []
+        }
       }
     }
 
@@ -256,6 +304,8 @@ export default {
 
     return {
       localRoute,
+      outboundTags,
+      ruleSetTags,
       addRule,
       removeRule,
       toggleRuleField,

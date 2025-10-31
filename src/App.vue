@@ -57,7 +57,13 @@
           <inbounds-config v-show="activeTab === 'inbounds'" :inbounds="config.inbounds" @update="updateInbounds" />
           <outbounds-config v-show="activeTab === 'outbounds'" :outbounds="config.outbounds" @update="updateOutbounds" />
           <rule-sets-config v-show="activeTab === 'rule-sets'" :rule-sets="config.route?.rule_set || []" @update="updateRuleSets" />
-          <routes-config v-show="activeTab === 'routes'" :route="config.route" @update="updateRoute" />
+          <routes-config 
+            v-show="activeTab === 'routes'" 
+            :route="config.route" 
+            :outbounds="config.outbounds"
+            :rule-sets="config.route?.rule_set || []"
+            @update="updateRoute" 
+          />
           <log-config v-show="activeTab === 'log'" :log="config.log" @update="updateLog" />
         </div>
 
