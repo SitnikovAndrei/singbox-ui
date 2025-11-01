@@ -73,6 +73,7 @@
             :route="config.route" 
             :outbounds="config.outbounds"
             :rule-sets="config.route?.rule_set || []"
+            :config="config"
             @update="updateRoute" 
           />
           <log-config v-show="activeTab === 'log'" :log="config.log" @update="updateLog" />
