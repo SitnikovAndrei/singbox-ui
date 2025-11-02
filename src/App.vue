@@ -64,19 +64,33 @@
 
         <!-- Tab Content -->
         <div class="space-y-6">
-          <dns-config v-show="activeTab === 'dns'" :dns="config.dns" @update="updateDns" />
-          <inbounds-config v-show="activeTab === 'inbounds'" :inbounds="config.inbounds" @update="updateInbounds" />
-          <outbounds-config v-show="activeTab === 'outbounds'" :outbounds="config.outbounds" @update="updateOutbounds" />
-          <rule-sets-config v-show="activeTab === 'rule-sets'" :rule-sets="config.route?.rule_set || []" @update="updateRuleSets" />
+          <dns-config 
+            v-show="activeTab === 'dns'" 
+            v-model="config.dns"
+            :outbounds="config.outbounds"
+          />
+          <inbounds-config 
+            v-show="activeTab === 'inbounds'" 
+            v-model="config.inbounds"
+          />
+          <outbounds-config 
+            v-show="activeTab === 'outbounds'" 
+            v-model="config.outbounds"
+          />
+          <rule-sets-config 
+            v-show="activeTab === 'rule-sets'" 
+            v-model="config.route.rule_set"
+          />
           <routes-config 
             v-show="activeTab === 'routes'" 
-            :route="config.route" 
+            v-model="config.route"
             :outbounds="config.outbounds"
-            :rule-sets="config.route?.rule_set || []"
-            :config="config"
-            @update="updateRoute" 
+            :rule-sets="config.route.rule_set"
           />
-          <log-config v-show="activeTab === 'log'" :log="config.log" @update="updateLog" />
+          <log-config 
+            v-show="activeTab === 'log'" 
+            v-model="config.log"
+          />
         </div>
 
         <div class="mt-8 flex flex-col sm:flex-row gap-4">
@@ -93,7 +107,7 @@
 
 <script>
 import { ref, onMounted } from 'vue'
-import { ConfigService } from './services/ConfigService'
+import ConfigService from './services/ConfigService'
 import DnsConfig from './components/DnsConfig.vue'
 import InboundsConfig from './components/InboundsConfig.vue'
 import OutboundsConfig from './components/OutboundsConfig.vue'
@@ -112,13 +126,29 @@ export default {
     LogConfig
   },
   setup() {
-    const config = ref(null)
+const config = ref({
+  log: { level: 'info' },
+  dns: {
+    servers: [],
+    strategy: 'prefer_ipv4',
+    final: 'google',
+    disable_cache: false,
+    disable_expire: false
+  },
+  inbounds: [],
+  outbounds: [],
+  route: {
+    rules: [],
+    rule_set: [],
+    auto_detect_interface: true,
+    final: 'direct'
+  }
+})
     const loading = ref(false)
     const saving = ref(false)
     const error = ref(null)
     const success = ref(null)
     const activeTab = ref('dns')
-    const configService = new ConfigService()
 
     const tabs = [
       { id: 'dns', name: 'DNS' },
@@ -133,7 +163,7 @@ export default {
       loading.value = true
       error.value = null
       try {
-        config.value = await configService.load()
+        config.value = await ConfigService.loadConfig()
       } catch (err) {
         error.value = `Failed to load configuration: ${err.message}`
       } finally {
@@ -146,7 +176,7 @@ export default {
       error.value = null
       success.value = null
       try {
-        await configService.save(config.value)
+        await ConfigService.saveConfig(config.value)
         success.value = 'Configuration saved successfully'
       } catch (err) {
         error.value = `Failed to save configuration: ${err.message}`
@@ -155,32 +185,6 @@ export default {
       }
     }
 
-    const updateDns = (dns) => {
-      config.value.dns = dns
-    }
-
-    const updateInbounds = (inbounds) => {
-      config.value.inbounds = inbounds
-    }
-
-    const updateOutbounds = (outbounds) => {
-      config.value.outbounds = outbounds
-    }
-
-    const updateRuleSets = (ruleSets) => {
-      if (!config.value.route) {
-        config.value.route = {}
-      }
-      config.value.route.rule_set = ruleSets
-    }
-
-    const updateRoute = (route) => {
-      config.value.route = route
-    }
-
-    const updateLog = (log) => {
-      config.value.log = log
-    }
 
     onMounted(() => {
       loadConfig()
@@ -195,13 +199,7 @@ export default {
       activeTab,
       tabs,
       loadConfig,
-      saveConfig,
-      updateDns,
-      updateInbounds,
-      updateOutbounds,
-      updateRuleSets,
-      updateRoute,
-      updateLog
+      saveConfig
     }
   }
 }

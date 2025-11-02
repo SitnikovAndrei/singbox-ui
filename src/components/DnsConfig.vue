@@ -1,146 +1,180 @@
 <template>
-  <div class="card">
-    <div class="card-header">
-      <h2 class="text-xl font-semibold">DNS Configuration</h2>
+  <div class="section">
+    <div class="section-header">
+      <h2 class="section-title">DNS Servers</h2>
+      <BaseButton @click="handleAdd">+ Add Server</BaseButton>
     </div>
-    <div class="card-body space-y-6">
-      <!-- Basic Settings -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div class="flex items-center">
-          <input
-            type="checkbox"
-            v-model="localDns.disable_cache"
-            id="disableCache"
-            class="form-checkbox"
+    
+    <div v-if="allServers.length === 0" class="empty-state">
+      No DNS servers configured. Click "Add Server" to create one.
+    </div>
+    
+    <div v-else class="list-container">
+      <BaseCard
+        v-for="server in allServers"
+        :key="server._id"
+        :disabled="server._disabled"
+      >
+        <template #header>
+          <div>
+            <h3 class="text-lg font-semibold">{{ server.tag }}</h3>
+            <p class="card-subtitle">{{ server.address }}</p>
+          </div>
+        </template>
+        
+        <template #headerActions>
+          <BaseToggle
+            :model-value="!server._disabled"
+            @update:modelValue="toggleDisable(server._id)"
           />
-          <label for="disableCache" class="ml-2 text-sm text-gray-700">Disable Cache</label>
-        </div>
-        <div class="flex items-center">
-          <input
-            type="checkbox"
-            v-model="localDns.disable_expire"
-            id="disableExpire"
-            class="form-checkbox"
-          />
-          <label for="disableExpire" class="ml-2 text-sm text-gray-700">Disable Expire</label>
-        </div>
-        <div>
-          <label class="form-label">Strategy</label>
-          <select v-model="localDns.strategy" class="form-select">
-            <option value="prefer_ipv4">Prefer IPv4</option>
-            <option value="prefer_ipv6">Prefer IPv6</option>
-            <option value="ipv4_only">IPv4 Only</option>
-            <option value="ipv6_only">IPv6 Only</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="w-full md:w-1/2">
-        <label class="form-label">Final DNS</label>
-        <input type="text" v-model="localDns.final" class="form-input">
-      </div>
-
-      <!-- DNS Servers -->
-      <div>
-        <div class="flex justify-between items-center mb-4">
-          <h3 class="text-lg font-medium text-gray-900">DNS Servers</h3>
-          <button @click="addServer" class="btn btn-success btn-sm">
-            + Add DNS Server
-          </button>
-        </div>
-
-        <div class="space-y-3">
-          <div
-            v-for="(server, index) in localDns.servers"
-            :key="index"
-            class="bg-gray-50 border border-gray-200 rounded-lg p-4"
-          >
-            <div class="flex items-start gap-4">
-              <div class="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label class="form-label">Address</label>
-                  <input
-                    type="text"
-                    v-model="server.address"
-                    class="form-input"
-                    placeholder="tls://8.8.8.8"
-                  />
-                </div>
-                <div>
-                  <label class="form-label">Tag</label>
-                  <input
-                    type="text"
-                    v-model="server.tag"
-                    class="form-input"
-                    placeholder="google"
-                  />
-                </div>
-                <div>
-                  <label class="form-label">Detour</label>
-                  <input
-                    type="text"
-                    v-model="server.detour"
-                    class="form-input"
-                    placeholder="direct"
-                  />
-                </div>
-              </div>
-              <button
-                @click="removeServer(index)"
-                class="mt-6 p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                title="Remove"
-              >
-                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/>
-                </svg>
-              </button>
-            </div>
+        </template>
+        
+        <div class="text-sm text-gray-600">
+          <div v-if="server.detour">
+            <strong>Detour:</strong> {{ server.detour }}
           </div>
         </div>
-      </div>
+        
+        <template #actions>
+          <BaseButton variant="secondary" @click="handleEdit(server)">
+            ✏️ Edit
+          </BaseButton>
+          <BaseButton variant="danger" @click="handleDelete(server._id)">
+            🗑️ Delete
+          </BaseButton>
+        </template>
+      </BaseCard>
     </div>
+    
+    <fieldset class="border border-gray-200 rounded-lg p-4 mt-6">
+      <legend class="text-sm font-medium text-gray-700 px-2">Global DNS Settings</legend>
+      
+      <div class="form-row">
+        <BaseSelect
+          :model-value="dnsSettings.strategy"
+          @update:model-value="updateDnsSetting('strategy', $event)"
+          label="Strategy"
+          :options="strategyOptions"
+        />
+        
+        <BaseInput
+          :model-value="dnsSettings.final"
+          @update:model-value="updateDnsSetting('final', $event)"
+          label="Final Server"
+          placeholder="google"
+        />
+      </div>
+      
+      <div class="flex gap-4">
+        <BaseToggle
+          :model-value="dnsSettings.disable_cache"
+          @update:model-value="updateDnsSetting('disable_cache', $event)"
+          label="Disable Cache"
+        />
+        
+        <BaseToggle
+          :model-value="dnsSettings.disable_expire"
+          @update:model-value="updateDnsSetting('disable_expire', $event)"
+          label="Disable Expire"
+        />
+      </div>
+    </fieldset>
+    
+    <DnsServerEditModal
+      :show="modal.isOpen.value"
+      :item="modal.currentItem.value"
+      :mode="modal.mode.value"
+      :outbounds="outbounds"
+      @close="modal.closeModal"
+      @save="handleSave"
+    />
   </div>
 </template>
 
-<script>
-import { reactive, watch } from 'vue'
+<script setup>
+import { computed } from 'vue'
+import BaseCard from './ui/BaseCard.vue'
+import BaseButton from './ui/BaseButton.vue'
+import BaseToggle from './ui/BaseToggle.vue'
+import BaseInput from './ui/BaseInput.vue'
+import BaseSelect from './ui/BaseSelect.vue'
+import DnsServerEditModal from './modals/DnsServerEditModal.vue'
+import { useConfigList } from '../composables/useConfigList'
+import { useModal } from '../composables/useModal'
 
-export default {
-  name: 'DnsConfig',
-  props: {
-    dns: {
-      type: Object,
-      required: true
-    }
+const props = defineProps({
+  modelValue: {
+    type: Object,
+    required: true
   },
-  emits: ['update'],
-  setup(props, { emit }) {
-    const localDns = reactive({ ...props.dns })
-
-    watch(localDns, (newVal) => {
-      emit('update', { ...newVal })
-    }, { deep: true })
-
-    const addServer = () => {
-      if (!localDns.servers) {
-        localDns.servers = []
-      }
-      localDns.servers.unshift({
-        address: '',
-        tag: '',
-        detour: 'direct'
-      })
-    }
-
-    const removeServer = (index) => {
-      localDns.servers.splice(index, 1)
-    }
-
-    return {
-      localDns,
-      addServer,
-      removeServer
-    }
+  outbounds: {
+    type: Array,
+    default: () => []
   }
+})
+
+const emit = defineEmits(['update:modelValue'])
+
+const list = useConfigList(props.modelValue.servers || [])
+const modal = useModal()
+
+const allServers = computed(() => list.items.value)
+
+const strategyOptions = [
+  { value: 'prefer_ipv4', label: 'Prefer IPv4' },
+  { value: 'prefer_ipv6', label: 'Prefer IPv6' },
+  { value: 'ipv4_only', label: 'IPv4 Only' },
+  { value: 'ipv6_only', label: 'IPv6 Only' }
+]
+
+const dnsSettings = computed(() => ({
+  strategy: props.modelValue.strategy || 'prefer_ipv4',
+  final: props.modelValue.final || 'google',
+  disable_cache: props.modelValue.disable_cache ?? false,
+  disable_expire: props.modelValue.disable_expire ?? false
+}))
+
+function handleAdd() {
+  modal.openModal()
+}
+
+function handleEdit(server) {
+  modal.openModal(server)
+}
+
+function handleDelete(id) {
+  if (confirm('Are you sure you want to delete this DNS server?')) {
+    list.deleteItem(id)
+    emitUpdate()
+  }
+}
+
+function toggleDisable(id) {
+  list.toggleDisable(id)
+  emitUpdate()
+}
+
+function updateDnsSetting(key, value) {
+  emit('update:modelValue', {
+    ...props.modelValue,
+    [key]: value
+  })
+}
+
+function handleSave(server) {
+  if (modal.mode.value === 'create') {
+    list.addItem(server)
+  } else {
+    list.updateItem(server._id, server)
+  }
+  emitUpdate()
+  modal.closeModal()
+}
+
+function emitUpdate() {
+  emit('update:modelValue', {
+    ...props.modelValue,
+    servers: list.items.value
+  })
 }
 </script>

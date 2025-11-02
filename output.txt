@@ -1,0 +1,2684 @@
+
+
+=== FILE: src\App.vue ===
+<template>
+  <div class="min-h-screen bg-gray-50 py-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+      <div v-if="error" class="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-md">
+        <div class="flex items-center justify-between">
+          <p class="text-red-800">{{ error }}</p>
+          <button @click="error = null" class="text-red-500 hover:text-red-700">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div v-if="success" class="mb-6 bg-green-50 border-l-4 border-green-500 p-4 rounded-md">
+        <div class="flex items-center justify-between">
+          <p class="text-green-800">{{ success }}</p>
+          <button @click="success = null" class="text-green-500 hover:text-green-700">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div v-if="loading" class="flex justify-center items-center py-20">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+
+      <div v-else-if="config">
+        <!-- Mobile Dropdown -->
+        <div class="md:hidden mb-6">
+          <label for="mobile-tabs" class="sr-only">Select a tab</label>
+          <select
+            id="mobile-tabs"
+            v-model="activeTab"
+            class="block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+          >
+            <option v-for="tab in tabs" :key="tab.id" :value="tab.id">
+              {{ tab.name }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Desktop Tabs -->
+        <div class="hidden md:block border-b border-gray-200 mb-6">
+          <nav class="-mb-px flex space-x-8">
+            <button
+              v-for="tab in tabs"
+              :key="tab.id"
+              @click="activeTab = tab.id"
+              :class="[
+                activeTab === tab.id
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
+                'whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors'
+              ]"
+            >
+              {{ tab.name }}
+            </button>
+          </nav>
+        </div>
+
+        <!-- Tab Content -->
+        <div class="space-y-6">
+          <dns-config 
+            v-show="activeTab === 'dns'" 
+            v-model="config.dns"
+            :outbounds="config.outbounds"
+          />
+          <inbounds-config 
+            v-show="activeTab === 'inbounds'" 
+            v-model="config.inbounds"
+          />
+          <outbounds-config 
+            v-show="activeTab === 'outbounds'" 
+            v-model="config.outbounds"
+          />
+          <rule-sets-config 
+            v-show="activeTab === 'rule-sets'" 
+            v-model="config.route.rule_set"
+          />
+          <routes-config 
+            v-show="activeTab === 'routes'" 
+            v-model="config.route"
+            :outbounds="config.outbounds"
+            :rule-sets="config.route.rule_set"
+          />
+          <log-config 
+            v-show="activeTab === 'log'" 
+            v-model="config.log"
+          />
+        </div>
+
+        <div class="mt-8 flex flex-col sm:flex-row gap-4">
+          <button @click="saveConfig" :disabled="saving" class="btn btn-primary w-full sm:w-auto">
+            <span v-if="saving" class="inline-block animate-spin mr-2">⟳</span>
+            Save Configuration
+          </button>
+          <button @click="loadConfig" class="btn btn-secondary w-full sm:w-auto">Reload</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+import { ref, onMounted } from 'vue'
+import ConfigService from './services/ConfigService'
+import DnsConfig from './components/DnsConfig.vue'
+import InboundsConfig from './components/InboundsConfig.vue'
+import OutboundsConfig from './components/OutboundsConfig.vue'
+import RuleSetsConfig from './components/RuleSetsConfig.vue'
+import RoutesConfig from './components/RoutesConfig.vue'
+import LogConfig from './components/LogConfig.vue'
+
+export default {
+  name: 'App',
+  components: {
+    DnsConfig,
+    InboundsConfig,
+    OutboundsConfig,
+    RuleSetsConfig,
+    RoutesConfig,
+    LogConfig
+  },
+  setup() {
+const config = ref({
+  log: { level: 'info' },
+  dns: {
+    servers: [],
+    strategy: 'prefer_ipv4',
+    final: 'google',
+    disable_cache: false,
+    disable_expire: false
+  },
+  inbounds: [],
+  outbounds: [],
+  route: {
+    rules: [],
+    rule_set: [],
+    auto_detect_interface: true,
+    final: 'direct'
+  }
+})
+    const loading = ref(false)
+    const saving = ref(false)
+    const error = ref(null)
+    const success = ref(null)
+    const activeTab = ref('dns')
+
+    const tabs = [
+      { id: 'dns', name: 'DNS' },
+      { id: 'inbounds', name: 'Inbounds' },
+      { id: 'outbounds', name: 'Outbounds' },
+      { id: 'rule-sets', name: 'Rule Sets' },
+      { id: 'routes', name: 'Routes' },
+      { id: 'log', name: 'Log' }
+    ]
+
+    const loadConfig = async () => {
+      loading.value = true
+      error.value = null
+      try {
+        config.value = await ConfigService.loadConfig()
+      } catch (err) {
+        error.value = `Failed to load configuration: ${err.message}`
+      } finally {
+        loading.value = false
+      }
+    }
+
+    const saveConfig = async () => {
+      saving.value = true
+      error.value = null
+      success.value = null
+      try {
+        await ConfigService.saveConfig(config.value)
+        success.value = 'Configuration saved successfully'
+      } catch (err) {
+        error.value = `Failed to save configuration: ${err.message}`
+      } finally {
+        saving.value = false
+      }
+    }
+
+
+    onMounted(() => {
+      loadConfig()
+    })
+
+    return {
+      config,
+      loading,
+      saving,
+      error,
+      success,
+      activeTab,
+      tabs,
+      loadConfig,
+      saveConfig
+    }
+  }
+}
+</script>
+
+=== FILE: src\main.js ===
+import { createApp } from 'vue'
+import App from './App.vue'
+import './style.css'
+
+createApp(App).mount('#app')
+
+=== FILE: src\style.css ===
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  /* Buttons */
+  .btn-base {
+    @apply px-4 py-2 rounded-lg font-medium transition-all duration-200 
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  
+  .btn-primary {
+    @apply btn-base bg-blue-600 text-white hover:bg-blue-700 
+           focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
+  }
+  
+  .btn-secondary {
+    @apply btn-base bg-gray-200 text-gray-700 hover:bg-gray-300
+           focus:ring-2 focus:ring-gray-400 focus:ring-offset-2;
+  }
+  
+  .btn-danger {
+    @apply btn-base bg-red-600 text-white hover:bg-red-700
+           focus:ring-2 focus:ring-red-500 focus:ring-offset-2;
+  }
+  
+  .btn-icon {
+    @apply p-2 rounded-lg transition-colors hover:bg-gray-100;
+  }
+  
+  /* Cards */
+  .card-compact {
+    @apply p-4 bg-white border border-gray-200 rounded-lg 
+           hover:shadow-md transition-shadow duration-200;
+  }
+  
+  .card-disabled {
+    @apply opacity-50 bg-gray-100;
+  }
+  
+  .card-disabled * {
+    @apply pointer-events-none;
+  }
+  
+  .card-header {
+    @apply flex items-center justify-between mb-3;
+  }
+  
+  .card-title {
+    @apply text-lg font-semibold text-gray-900;
+  }
+  
+  .card-subtitle {
+    @apply text-sm text-gray-600 mt-1;
+  }
+  
+  .card-actions {
+    @apply flex gap-2 mt-4 pt-3 border-t border-gray-100;
+  }
+  
+  /* Inputs */
+  .input-field {
+    @apply w-full px-3 py-2 border border-gray-300 rounded-lg
+           focus:ring-2 focus:ring-blue-500 focus:border-transparent
+           disabled:bg-gray-100 disabled:cursor-not-allowed;
+  }
+  
+  .input-error {
+    @apply border-red-500 focus:ring-red-500;
+  }
+  
+  /* Labels */
+  .label-text {
+    @apply block text-sm font-medium text-gray-700 mb-1;
+  }
+  
+  .label-required::after {
+    @apply text-red-500;
+    content: ' *';
+  }
+  
+  /* Form Groups */
+  .form-group {
+    @apply mb-4;
+  }
+  
+  .form-row {
+    @apply grid grid-cols-1 md:grid-cols-2 gap-4;
+  }
+  
+  /* Modal */
+  .modal-overlay {
+    @apply fixed inset-0 bg-black bg-opacity-50 z-40 
+           flex items-center justify-center p-4;
+  }
+  
+  .modal-content {
+    @apply bg-white rounded-lg shadow-xl z-50 
+           max-h-[90vh] overflow-hidden flex flex-col
+           w-full max-w-2xl;
+  }
+  
+  .modal-header {
+    @apply px-6 py-4 border-b border-gray-200 flex items-center justify-between;
+  }
+  
+  .modal-title {
+    @apply text-xl font-semibold text-gray-900;
+  }
+  
+  .modal-body {
+    @apply px-6 py-4 overflow-y-auto flex-1;
+  }
+  
+  .modal-footer {
+    @apply px-6 py-4 border-t border-gray-200 flex justify-end gap-3;
+  }
+  
+  /* Badges */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+  
+  .badge-primary {
+    @apply badge bg-blue-100 text-blue-800;
+  }
+  
+  .badge-success {
+    @apply badge bg-green-100 text-green-800;
+  }
+  
+  .badge-warning {
+    @apply badge bg-yellow-100 text-yellow-800;
+  }
+  
+  .badge-danger {
+    @apply badge bg-red-100 text-red-800;
+  }
+  
+  /* Toggle */
+  .toggle-wrapper {
+    @apply relative inline-block w-11 h-6;
+  }
+  
+  .toggle-input {
+    @apply sr-only;
+  }
+  
+  .toggle-slider {
+    @apply absolute cursor-pointer inset-0 bg-gray-300 rounded-full
+           transition-colors duration-200;
+  }
+  
+  .toggle-input:checked + .toggle-slider {
+    @apply bg-blue-600;
+  }
+  
+  .toggle-slider::before {
+    @apply absolute content-[''] h-5 w-5 left-0.5 bottom-0.5 
+           bg-white rounded-full transition-transform duration-200;
+  }
+  
+  .toggle-input:checked + .toggle-slider::before {
+    @apply transform translate-x-5;
+  }
+  
+  /* Section */
+  .section {
+    @apply mb-8;
+  }
+  
+  .section-header {
+    @apply mb-4 flex items-center justify-between;
+  }
+  
+  .section-title {
+    @apply text-2xl font-bold text-gray-900;
+  }
+  
+  /* List */
+  .list-container {
+    @apply space-y-3;
+  }
+  
+  /* Empty State */
+  .empty-state {
+    @apply text-center py-12 text-gray-500;
+  }
+}
+
+=== FILE: src\components\DnsConfig.vue ===
+<template>
+  <div class="section">
+    <div class="section-header">
+      <h2 class="section-title">DNS Servers</h2>
+      <BaseButton @click="handleAdd">+ Add Server</BaseButton>
+    </div>
+    
+    <div v-if="allServers.length === 0" class="empty-state">
+      No DNS servers configured. Click "Add Server" to create one.
+    </div>
+    
+    <div v-else class="list-container">
+      <BaseCard
+        v-for="server in allServers"
+        :key="server._id"
+        :disabled="server._disabled"
+      >
+        <template #header>
+          <div>
+            <h3 class="text-lg font-semibold">{{ server.tag }}</h3>
+            <p class="card-subtitle">{{ server.address }}</p>
+          </div>
+        </template>
+        
+        <template #headerActions>
+          <BaseToggle
+            :model-value="!server._disabled"
+            @update:model-value="(value) => toggleDisable(server._id)"
+          />
+        </template>
+        
+        <div class="text-sm text-gray-600">
+          <div v-if="server.detour">
+            <strong>Detour:</strong> {{ server.detour }}
+          </div>
+        </div>
+        
+        <template #actions>
+          <BaseButton variant="secondary" @click="handleEdit(server)">
+            ✏️ Edit
+          </BaseButton>
+          <BaseButton variant="danger" @click="handleDelete(server._id)">
+            🗑️ Delete
+          </BaseButton>
+        </template>
+      </BaseCard>
+    </div>
+    
+    <fieldset class="border border-gray-200 rounded-lg p-4 mt-6">
+      <legend class="text-sm font-medium text-gray-700 px-2">Global DNS Settings</legend>
+      
+      <div class="form-row">
+        <BaseSelect
+          :model-value="dnsSettings.strategy"
+          @update:model-value="updateDnsSetting('strategy', $event)"
+          label="Strategy"
+          :options="strategyOptions"
+        />
+        
+        <BaseInput
+          :model-value="dnsSettings.final"
+          @update:model-value="updateDnsSetting('final', $event)"
+          label="Final Server"
+          placeholder="google"
+        />
+      </div>
+      
+      <div class="flex gap-4">
+        <BaseToggle
+          :model-value="dnsSettings.disable_cache"
+          @update:model-value="updateDnsSetting('disable_cache', $event)"
+          label="Disable Cache"
+        />
+        
+        <BaseToggle
+          :model-value="dnsSettings.disable_expire"
+          @update:model-value="updateDnsSetting('disable_expire', $event)"
+          label="Disable Expire"
+        />
+      </div>
+    </fieldset>
+    
+    <DnsServerEditModal
+      :show="modal.isOpen.value"
+      :item="modal.currentItem.value"
+      :mode="modal.mode.value"
+      :outbounds="outbounds"
+      @close="modal.closeModal"
+      @save="handleSave"
+    />
+  </div>
+</template>
+
+<script setup>
+import { computed } from 'vue'
+import BaseCard from './ui/BaseCard.vue'
+import BaseButton from './ui/BaseButton.vue'
+import BaseToggle from './ui/BaseToggle.vue'
+import BaseInput from './ui/BaseInput.vue'
+import BaseSelect from './ui/BaseSelect.vue'
+import DnsServerEditModal from './modals/DnsServerEditModal.vue'
+import { useConfigList } from '../composables/useConfigList'
+import { useModal } from '../composables/useModal'
+
+const props = defineProps({
+  modelValue: {
+    type: Object,
+    required: true
+  },
+  outbounds: {
+    type: Array,
+    default: () => []
+  }
+})
+
+const emit = defineEmits(['update:modelValue'])
+
+const list = useConfigList(props.modelValue.servers || [])
+const modal = useModal()
+
+const allServers = computed(() => list.items.value)
+
+const strategyOptions = [
+  { value: 'prefer_ipv4', label: 'Prefer IPv4' },
+  { value: 'prefer_ipv6', label: 'Prefer IPv6' },
+  { value: 'ipv4_only', label: 'IPv4 Only' },
+  { value: 'ipv6_only', label: 'IPv6 Only' }
+]
+
+const dnsSettings = computed(() => ({
+  strategy: props.modelValue.strategy || 'prefer_ipv4',
+  final: props.modelValue.final || 'google',
+  disable_cache: props.modelValue.disable_cache ?? false,
+  disable_expire: props.modelValue.disable_expire ?? false
+}))
+
+function handleAdd() {
+  modal.openModal()
+}
+
+function handleEdit(server) {
+  modal.openModal(server)
+}
+
+function handleDelete(id) {
+  if (confirm('Are you sure you want to delete this DNS server?')) {
+    list.deleteItem(id)
+    emitUpdate()
+  }
+}
+
+function toggleDisable(id) {
+  list.toggleDisable(id)
+  emitUpdate()
+}
+
+function updateDnsSetting(key, value) {
+  emit('update:modelValue', {
+    ...props.modelValue,
+    [key]: value
+  })
+}
+
+function handleSave(server) {
+  if (modal.mode.value === 'create') {
+    list.addItem(server)
+  } else {
+    list.updateItem(server._id, server)
+  }
+  emitUpdate()
+  modal.closeModal()
+}
+
+function emitUpdate() {
+  emit('update:modelValue', {
+    ...props.modelValue,
+    servers: list.items.value
+  })
+}
+</script>
+
+=== FILE: src\components\InboundsConfig.vue ===
+<template>
+  <div class="section">
+    <div class="section-header">
+      <h2 class="section-title">Inbounds</h2>
+      <BaseButton @click="handleAdd">+ Add Inbound</BaseButton>
+    </div>
+    
+    <div v-if="allItems.length === 0" class="empty-state">
+      No inbounds configured. Click "Add Inbound" to create one.
+    </div>
+    
+    <div v-else class="list-container">
+      <BaseCard
+        v-for="item in allItems"
+        :key="item._id"
+        :disabled="item._disabled"
+      >
+        <template #header>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="badge badge-primary">{{ item.type }}</span>
+              <h3 class="text-lg font-semibold">{{ item.tag || 'Unnamed' }}</h3>
+            </div>
+            <p class="card-subtitle">
+              {{ item.listen }}:{{ item.listen_port }}
+            </p>
+          </div>
+        </template>
+        
+        <template #headerActions>
+          <BaseToggle
+            :model-value="!item._disabled"
+            @update:model-value="(value) => toggleDisable(item._id)"
+          />
+        </template>
+        
+        <div class="text-sm text-gray-600 space-y-1">
+          <div v-if="item.sniff">
+            <span class="badge badge-success">Sniff Enabled</span>
+          </div>
+          <div v-if="item.domain_strategy">
+            <strong>Domain Strategy:</strong> {{ item.domain_strategy }}
+          </div>
+          <div v-if="item.tcp_fast_open">
+            <span class="badge badge-success">TCP Fast Open</span>
+          </div>
+        </div>
+        
+        <template #actions>
+          <BaseButton variant="secondary" @click="handleEdit(item)">
+            ✏️ Edit
+          </BaseButton>
+          <BaseButton variant="danger" @click="handleDelete(item._id)">
+            🗑️ Delete
+          </BaseButton>
+        </template>
+      </BaseCard>
+    </div>
+    
+    <InboundEditModal
+      :show="modal.isOpen.value"
+      :item="modal.currentItem.value"
+      :mode="modal.mode.value"
+      @close="modal.closeModal"
+      @save="handleSave"
+    />
+  </div>
+</template>
+
+<script setup>
+import { computed } from 'vue'
+import BaseCard from './ui/BaseCard.vue'
+import BaseButton from './ui/BaseButton.vue'
+import BaseToggle from './ui/BaseToggle.vue'
+import InboundEditModal from './modals/InboundEditModal.vue'
+import { useConfigList } from '../composables/useConfigList'
+import { useModal } from '../composables/useModal'
+
+const props = defineProps({
+  modelValue: {
+    type: Array,
+    default: () => []
+  }
+})
+
+const emit = defineEmits(['update:modelValue'])
+
+const list = useConfigList(props.modelValue)
+const modal = useModal()
+
+const allItems = computed(() => list.items.value)
+
+function handleAdd() {
+  modal.openModal()
+}
+
+function handleEdit(item) {
+  modal.openModal(item)
+}
+
+function handleDelete(id) {
+  if (confirm('Are you sure you want to delete this inbound?')) {
+    list.deleteItem(id)
+    emit('update:modelValue', list.items.value)
+  }
+}
+
+function toggleDisable(id) {
+  list.toggleDisable(id)
+  emit('update:modelValue', list.items.value)
+}
+
+function handleSave(item) {
+  if (modal.mode.value === 'create') {
+    list.addItem(item)
+  } else {
+    list.updateItem(item._id, item)
+  }
+  emit('update:modelValue', list.items.value)
+  modal.closeModal()
+}
+</script>
+
+=== FILE: src\components\LogConfig.vue ===
+<template>
+  <div class="section">
+    <div class="section-header">
+      <h2 class="section-title">Log Settings</h2>
+    </div>
+    
+    <div class="card-compact">
+      <BaseSelect
+        :model-value="modelValue.level"
+        @update:model-value="updateLevel"
+        label="Log Level"
+        :options="logLevelOptions"
+        hint="Set the verbosity of logging output"
+      />
+    </div>
+  </div>
+</template>
+
+<script setup>
+import BaseSelect from './ui/BaseSelect.vue'
+
+const props = defineProps({
+  modelValue: {
+    type: Object,
+    default: () => ({ level: 'info' })
+  }
+})
+
+const emit = defineEmits(['update:modelValue'])
+
+const logLevelOptions = [
+  { value: 'trace', label: 'Trace (Most Verbose)' },
+  { value: 'debug', label: 'Debug' },
+  { value: 'info', label: 'Info' },
+  { value: 'warn', label: 'Warning' },
+  { value: 'error', label: 'Error' },
+  { value: 'fatal', label: 'Fatal (Least Verbose)' }
+]
+
+function updateLevel(level) {
+  emit('update:modelValue', {
+    ...props.modelValue,
+    level
+  })
+}
+</script>
+
+=== FILE: src\components\OutboundsConfig.vue ===
+<template>
+  <div class="section">
+    <div class="section-header">
+      <h2 class="section-title">Outbounds</h2>
+      <BaseButton @click="handleAdd">+ Add Outbound</BaseButton>
+    </div>
+    
+    <div v-if="allItems.length === 0" class="empty-state">
+      No outbounds configured. Click "Add Outbound" to create one.
+    </div>
+    
+    <div v-else class="list-container">
+      <BaseCard
+        v-for="item in allItems"
+        :key="item._id"
+        :disabled="item._disabled"
+      >
+        <template #header>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="badge badge-primary">{{ item.type }}</span>
+              <h3 class="text-lg font-semibold">{{ item.tag }}</h3>
+            </div>
+            <p class="card-subtitle">
+              {{ getOutboundSummary(item) }}
+            </p>
+          </div>
+        </template>
+        
+        <template #headerActions>
+          <BaseToggle
+            :model-value="!item._disabled"
+            @update:model-value="(value) => toggleDisable(item._id)"
+          />
+        </template>
+        
+        <div class="text-sm text-gray-600">
+          <div v-if="item.server">
+            <strong>Server:</strong> {{ item.server }}:{{ item.server_port }}
+          </div>
+          <div v-if="item.method">
+            <strong>Method:</strong> {{ item.method }}
+          </div>
+          <div v-if="item.network">
+            <strong>Network:</strong> {{ item.network }}
+          </div>
+          <div v-if="item.tls?.enabled">
+            <span class="badge badge-success">TLS Enabled</span>
+            <span v-if="item.tls.reality?.enabled" class="badge badge-success ml-1">Reality</span>
+          </div>
+        </div>
+        
+        <template #actions>
+          <BaseButton variant="secondary" @click="handleEdit(item)">
+            ✏️ Edit
+          </BaseButton>
+          <BaseButton variant="danger" @click="handleDelete(item._id)">
+            🗑️ Delete
+          </BaseButton>
+        </template>
+      </BaseCard>
+    </div>
+    
+    <OutboundEditModal
+      :show="modal.isOpen.value"
+      :item="modal.currentItem.value"
+      :mode="modal.mode.value"
+      @close="modal.closeModal"
+      @save="handleSave"
+    />
+  </div>
+</template>
+
+<script setup>
+import { computed } from 'vue'
+import BaseCard from './ui/BaseCard.vue'
+import BaseButton from './ui/BaseButton.vue'
+import BaseToggle from './ui/BaseToggle.vue'
+import OutboundEditModal from './modals/OutboundEditModal.vue'
+import { useConfigList } from '../composables/useConfigList'
+import { useModal } from '../composables/useModal'
+
+const props = defineProps({
+  modelValue: {
+    type: Array,
+    default: () => []
+  }
+})
+
+const emit = defineEmits(['update:modelValue'])
+
+const list = useConfigList(props.modelValue)
+const modal = useModal()
+
+const allItems = computed(() => list.items.value)
+
+function getOutboundSummary(item) {
+  if (item.type === 'direct') return 'Direct connection'
+  if (item.type === 'block') return 'Block traffic'
+  if (item.server) return `${item.server}:${item.server_port}`
+  return 'No server configured'
+}
+
+function handleAdd() {
+  modal.openModal()
+}
+
+function handleEdit(item) {
+  modal.openModal(item)
+}
+
+function handleDelete(id) {
+  if (confirm('Are you sure you want to delete this outbound?')) {
+    list.deleteItem(id)
+    emit('update:modelValue', list.items.value)
+  }
+}
+
+function toggleDisable(id) {
+  list.toggleDisable(id)
+  emit('update:modelValue', list.items.value)
+}
+
+function handleSave(item) {
+  if (modal.mode.value === 'create') {
+    list.addItem(item)
+  } else {
+    list.updateItem(item._id, item)
+  }
+  emit('update:modelValue', list.items.value)
+  modal.closeModal()
+}
+</script>
+
+=== FILE: src\components\RoutesConfig.vue ===
+<template>
+  <div class="section">
+    <div class="section-header">
+      <h2 class="section-title">Route Rules</h2>
+      <BaseButton @click="handleAdd">+ Add Rule</BaseButton>
+    </div>
+    
+    <div v-if="allItems.length === 0" class="empty-state">
+      No routing rules configured. Click "Add Rule" to create one.
+    </div>
+    
+    <div v-else class="list-container">
+      <BaseCard
+        v-for="item in allItems"
+        :key="item._id"
+        :disabled="item._disabled"
+      >
+        <template #header>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="badge badge-warning">Rule #{{ item._order + 1 }}</span>
+              <span class="badge badge-primary">→ {{ item.outbound }}</span>
+            </div>
+            <p class="card-subtitle mt-2">
+              {{ getRuleSummary(item) }}
+            </p>
+          </div>
+        </template>
+        
+        <template #headerActions>
+          <div class="flex gap-1">
+            <BaseButton 
+              variant="icon" 
+              @click="moveItem(item._id, 'up')"
+              :disabled="item._order === 0"
+            >
+              ⬆️
+            </BaseButton>
+            <BaseButton 
+              variant="icon" 
+              @click="moveItem(item._id, 'down')"
+              :disabled="item._order === allItems.length - 1"
+            >
+              ⬇️
+            </BaseButton>
+            <BaseToggle
+              :model-value="!item._disabled"
+              @update:model-value="(value) => toggleDisable(item._id)"
+            />
+          </div>
+        </template>
+        
+        <div class="text-sm text-gray-600 space-y-1">
+          <div v-if="item.source_ip_cidr?.length">
+            <strong>Source IPs:</strong> {{ item.source_ip_cidr.join(', ') }}
+          </div>
+          <div v-if="item.ip_cidr?.length">
+            <strong>Destination IPs:</strong> {{ item.ip_cidr.join(', ') }}
+          </div>
+          <div v-if="item.domain_suffix?.length">
+            <strong>Domains:</strong> {{ item.domain_suffix.join(', ') }}
+          </div>
+          <div v-if="item.rule_set">
+            <strong>Rule Set:</strong> {{ item.rule_set }}
+          </div>
+        </div>
+        
+        <template #actions>
+          <BaseButton variant="secondary" @click="handleEdit(item)">
+            ✏️ Edit
+          </BaseButton>
+          <BaseButton variant="danger" @click="handleDelete(item._id)">
+            🗑️ Delete
+          </BaseButton>
+        </template>
+      </BaseCard>
+    </div>
+    
+    <fieldset class="border border-gray-200 rounded-lg p-4 mt-6">
+      <legend class="text-sm font-medium text-gray-700 px-2">Global Route Settings</legend>
+      
+      <BaseToggle
+        :model-value="routeSettings.auto_detect_interface"
+        @update:model-value="updateRouteSetting('auto_detect_interface', $event)"
+        label="Auto Detect Interface"
+      />
+      
+      <BaseInput
+        :model-value="routeSettings.final"
+        @update:model-value="updateRouteSetting('final', $event)"
+        label="Final Outbound"
+        placeholder="direct"
+        hint="Default outbound when no rules match"
+      />
+    </fieldset>
+    
+    <RouteRuleEditModal
+      :show="modal.isOpen.value"
+      :item="modal.currentItem.value"
+      :mode="modal.mode.value"
+      :outbounds="outbounds"
+      :rule-sets="ruleSets"
+      @close="modal.closeModal"
+      @save="handleSave"
+    />
+  </div>
+</template>
+
+<script setup>
+import { computed } from 'vue'
+import BaseCard from './ui/BaseCard.vue'
+import BaseButton from './ui/BaseButton.vue'
+import BaseToggle from './ui/BaseToggle.vue'
+import BaseInput from './ui/BaseInput.vue'
+import RouteRuleEditModal from './modals/RouteRuleEditModal.vue'
+import { useConfigList } from '../composables/useConfigList'
+import { useModal } from '../composables/useModal'
+
+const props = defineProps({
+  modelValue: {
+    type: Object,
+    required: true
+  },
+  outbounds: {
+    type: Array,
+    default: () => []
+  },
+  ruleSets: {
+    type: Array,
+    default: () => []
+  }
+})
+
+const emit = defineEmits(['update:modelValue'])
+
+const list = useConfigList(props.modelValue.rules || [])
+const modal = useModal()
+
+const allItems = computed(() => list.items.value)
+const routeSettings = computed(() => ({
+  auto_detect_interface: props.modelValue.auto_detect_interface ?? true,
+  final: props.modelValue.final || 'direct'
+}))
+
+function getRuleSummary(item) {
+  const conditions = []
+  if (item.source_ip_cidr?.length) conditions.push(`${item.source_ip_cidr.length} source IPs`)
+  if (item.ip_cidr?.length) conditions.push(`${item.ip_cidr.length} dest IPs`)
+  if (item.domain_suffix?.length) conditions.push(`${item.domain_suffix.length} domains`)
+  if (item.rule_set) conditions.push(`rule set: ${item.rule_set}`)
+  return conditions.length ? conditions.join(' • ') : 'No conditions'
+}
+
+function handleAdd() {
+  modal.openModal()
+}
+
+function handleEdit(item) {
+  modal.openModal(item)
+}
+
+function handleDelete(id) {
+  if (confirm('Are you sure you want to delete this rule?')) {
+    list.deleteItem(id)
+    emitUpdate()
+  }
+}
+
+function toggleDisable(id) {
+  list.toggleDisable(id)
+  emitUpdate()
+}
+
+function moveItem(id, direction) {
+  list.moveItem(id, direction)
+  list.items.value.forEach((item, index) => {
+    item._order = index
+  })
+  emitUpdate()
+}
+
+function updateRouteSetting(key, value) {
+  emit('update:modelValue', {
+    ...props.modelValue,
+    [key]: value
+  })
+}
+
+function handleSave(item) {
+  if (modal.mode.value === 'create') {
+    list.addItem(item)
+  } else {
+    list.updateItem(item._id, item)
+  }
+  emitUpdate()
+  modal.closeModal()
+}
+
+function emitUpdate() {
+  emit('update:modelValue', {
+    ...props.modelValue,
+    rules: list.items.value
+  })
+}
+</script>
+
+=== FILE: src\components\RuleSetsConfig.vue ===
+<template>
+  <div class="section">
+    <div class="section-header">
+      <h2 class="section-title">Rule Sets</h2>
+      <BaseButton @click="handleAdd">+ Add Rule Set</BaseButton>
+    </div>
+    
+    <div v-if="allItems.length === 0" class="empty-state">
+      No rule sets configured. Click "Add Rule Set" to create one.
+    </div>
+    
+    <div v-else class="list-container">
+      <BaseCard
+        v-for="item in allItems"
+        :key="item._id"
+        :disabled="item._disabled"
+      >
+        <template #header>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="badge badge-primary">{{ item.type }}</span>
+              <h3 class="text-lg font-semibold">{{ item.tag }}</h3>
+            </div>
+            <p class="card-subtitle">{{ item.format }}</p>
+          </div>
+        </template>
+        
+        <template #headerActions>
+          <BaseToggle
+            :model-value="!item._disabled"
+            @update:model-value="(value) => toggleDisable(item._id)"
+          />
+        </template>
+        
+        <div class="text-sm text-gray-600">
+          <div class="break-all">
+            <strong>URL:</strong> {{ item.url }}
+          </div>
+        </div>
+        
+        <template #actions>
+          <BaseButton variant="secondary" @click="handleEdit(item)">
+            ✏️ Edit
+          </BaseButton>
+          <BaseButton variant="danger" @click="handleDelete(item._id)">
+            🗑️ Delete
+          </BaseButton>
+        </template>
+      </BaseCard>
+    </div>
+    
+    <RuleSetEditModal
+      :show="modal.isOpen.value"
+      :item="modal.currentItem.value"
+      :mode="modal.mode.value"
+      @close="modal.closeModal"
+      @save="handleSave"
+    />
+  </div>
+</template>
+
+<script setup>
+import { computed } from 'vue'
+import BaseCard from './ui/BaseCard.vue'
+import BaseButton from './ui/BaseButton.vue'
+import BaseToggle from './ui/BaseToggle.vue'
+import RuleSetEditModal from './modals/RuleSetEditModal.vue'
+import { useConfigList } from '../composables/useConfigList'
+import { useModal } from '../composables/useModal'
+
+const props = defineProps({
+  modelValue: {
+    type: Array,
+    default: () => []
+  }
+})
+
+const emit = defineEmits(['update:modelValue'])
+
+const list = useConfigList(props.modelValue)
+const modal = useModal()
+
+const allItems = computed(() => list.items.value)
+
+function handleAdd() {
+  modal.openModal()
+}
+
+function handleEdit(item) {
+  modal.openModal(item)
+}
+
+function handleDelete(id) {
+  if (confirm('Are you sure you want to delete this rule set?')) {
+    list.deleteItem(id)
+    emit('update:modelValue', list.items.value)
+  }
+}
+
+function toggleDisable(id) {
+  list.toggleDisable(id)
+  emit('update:modelValue', list.items.value)
+}
+
+function handleSave(item) {
+  if (modal.mode.value === 'create') {
+    list.addItem(item)
+  } else {
+    list.updateItem(item._id, item)
+  }
+  emit('update:modelValue', list.items.value)
+  modal.closeModal()
+}
+</script>
+
+=== FILE: src\components\modals\DnsServerEditModal.vue ===
+<template>
+  <BaseModal
+    :show="show"
+    :title="mode === 'create' ? 'Add DNS Server' : 'Edit DNS Server'"
+    :loading="loading"
+    @close="$emit('close')"
+    @confirm="handleSave"
+  >
+    <form @submit.prevent="handleSave">
+      <BaseInput
+        v-model="form.tag"
+        label="Tag"
+        placeholder="google"
+        required
+        hint="Unique identifier for this DNS server"
+      />
+      
+      <BaseInput
+        v-model="form.address"
+        label="Address"
+        placeholder="tls://8.8.8.8"
+        required
+        hint="DNS server address (supports tls://, https://, udp://)"
+      />
+      
+      <BaseSelect
+        v-model="form.detour"
+        label="Detour"
+        :options="detourOptions"
+        placeholder="Select outbound"
+        hint="Outbound to use for DNS queries"
+      />
+    </form>
+  </BaseModal>
+</template>
+
+<script setup>
+import { ref, computed, watch } from 'vue'
+import BaseModal from '../ui/BaseModal.vue'
+import BaseInput from '../ui/BaseInput.vue'
+import BaseSelect from '../ui/BaseSelect.vue'
+
+const props = defineProps({
+  show: Boolean,
+  item: Object,
+  mode: String,
+  outbounds: {
+    type: Array,
+    default: () => []
+  }
+})
+
+const emit = defineEmits(['close', 'save'])
+
+const loading = ref(false)
+
+const detourOptions = computed(() => [
+  { value: '', label: 'None' },
+  ...props.outbounds
+    .filter(o => !o._disabled && o.tag)
+    .map(o => ({ value: o.tag, label: `${o.tag} (${o.type})` }))
+])
+
+const defaultForm = {
+  tag: '',
+  address: '',
+  detour: ''
+}
+
+const form = ref({ ...defaultForm })
+
+watch(() => props.item, (newItem) => {
+  if (newItem) {
+    form.value = { ...defaultForm, ...newItem }
+  } else {
+    form.value = { ...defaultForm }
+  }
+}, { immediate: true })
+
+async function handleSave() {
+  loading.value = true
+  
+  try {
+    const cleanedForm = { ...form.value }
+    if (!cleanedForm.detour) delete cleanedForm.detour
+    
+    emit('save', cleanedForm)
+  } finally {
+    loading.value = false
+  }
+}
+</script>
+
+=== FILE: src\components\modals\InboundEditModal.vue ===
+<template>
+  <BaseModal
+    :show="show"
+    :title="mode === 'create' ? 'Add Inbound' : 'Edit Inbound'"
+    :loading="loading"
+    @close="$emit('close')"
+    @confirm="handleSave"
+  >
+    <form @submit.prevent="handleSave">
+      <BaseSelect
+        v-model="form.type"
+        label="Type"
+        :options="typeOptions"
+        required
+      />
+      
+      <BaseInput
+        v-model="form.tag"
+        label="Tag"
+        placeholder="tproxy-in"
+        hint="Optional identifier for this inbound"
+      />
+      
+      <div class="form-row">
+        <BaseInput
+          v-model="form.listen"
+          label="Listen Address"
+          placeholder="127.0.0.1"
+          required
+        />
+        <BaseInput
+          v-model.number="form.listen_port"
+          label="Port"
+          type="number"
+          placeholder="7893"
+          required
+        />
+      </div>
+      
+      <BaseToggle
+        v-model="form.sniff"
+        label="Enable Traffic Sniffing"
+      />
+      
+      <BaseToggle
+        v-if="form.sniff"
+        v-model="form.sniff_override_destination"
+        label="Override Destination from Sniff"
+      />
+      
+      <BaseSelect
+        v-model="form.domain_strategy"
+        label="Domain Strategy"
+        :options="domainStrategyOptions"
+      />
+      
+      <BaseToggle
+        v-model="form.tcp_fast_open"
+        label="TCP Fast Open"
+      />
+      
+      <BaseToggle
+        v-model="form.udp_fragment"
+        label="UDP Fragment"
+      />
+    </form>
+  </BaseModal>
+</template>
+
+<script setup>
+import { ref, watch } from 'vue'
+import BaseModal from '../ui/BaseModal.vue'
+import BaseInput from '../ui/BaseInput.vue'
+import BaseSelect from '../ui/BaseSelect.vue'
+import BaseToggle from '../ui/BaseToggle.vue'
+
+const props = defineProps({
+  show: Boolean,
+  item: Object,
+  mode: String
+})
+
+const emit = defineEmits(['close', 'save'])
+
+const loading = ref(false)
+
+const typeOptions = [
+  { value: 'tproxy', label: 'TProxy' },
+  { value: 'mixed', label: 'Mixed' },
+  { value: 'http', label: 'HTTP' },
+  { value: 'socks', label: 'SOCKS' }
+]
+
+const domainStrategyOptions = [
+  { value: 'ipv4_only', label: 'IPv4 Only' },
+  { value: 'ipv6_only', label: 'IPv6 Only' },
+  { value: 'prefer_ipv4', label: 'Prefer IPv4' },
+  { value: 'prefer_ipv6', label: 'Prefer IPv6' }
+]
+
+const defaultForm = {
+  type: 'tproxy',
+  tag: '',
+  listen: '127.0.0.1',
+  listen_port: 7893,
+  sniff: true,
+  sniff_override_destination: true,
+  domain_strategy: 'ipv4_only',
+  tcp_fast_open: true,
+  udp_fragment: false
+}
+
+const form = ref({ ...defaultForm })
+
+watch(() => props.item, (newItem) => {
+  if (newItem) {
+    form.value = { ...defaultForm, ...newItem }
+  } else {
+    form.value = { ...defaultForm }
+  }
+}, { immediate: true })
+
+async function handleSave() {
+  loading.value = true
+  
+  try {
+    emit('save', { ...form.value })
+  } finally {
+    loading.value = false
+  }
+}
+</script>
+
+=== FILE: src\components\modals\OutboundEditModal.vue ===
+<template>
+  <BaseModal
+    :show="show"
+    :title="mode === 'create' ? 'Add Outbound' : 'Edit Outbound'"
+    :loading="loading"
+    @close="$emit('close')"
+    @confirm="handleSave"
+  >
+    <form @submit.prevent="handleSave">
+      <BaseSelect
+        v-model="form.type"
+        label="Type"
+        :options="typeOptions"
+        required
+      />
+      
+      <BaseInput
+        v-model="form.tag"
+        label="Tag"
+        placeholder="unique-identifier"
+        required
+        hint="Unique identifier for this outbound"
+      />
+      
+      <!-- Shadowsocks fields -->
+      <template v-if="form.type === 'shadowsocks'">
+        <div class="form-row">
+          <BaseInput
+            v-model="form.server"
+            label="Server"
+            placeholder="example.com"
+            required
+          />
+          <BaseInput
+            v-model.number="form.server_port"
+            label="Port"
+            type="number"
+            placeholder="8443"
+            required
+          />
+        </div>
+        
+        <BaseSelect
+          v-model="form.method"
+          label="Method"
+          :options="shadowsocksMethodOptions"
+          required
+        />
+        
+        <BaseInput
+          v-model="form.password"
+          label="Password"
+          type="password"
+          required
+        />
+        
+        <BaseSelect
+          v-model="form.network"
+          label="Network"
+          :options="networkOptions"
+        />
+      </template>
+      
+      <!-- VLESS fields -->
+      <template v-if="form.type === 'vless'">
+        <div class="form-row">
+          <BaseInput
+            v-model="form.server"
+            label="Server"
+            placeholder="example.com"
+            required
+          />
+          <BaseInput
+            v-model.number="form.server_port"
+            label="Port"
+            type="number"
+            placeholder="443"
+            required
+          />
+        </div>
+        
+        <BaseInput
+          v-model="form.uuid"
+          label="UUID"
+          placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+          required
+        />
+        
+        <div class="form-row">
+          <BaseSelect
+            v-model="form.network"
+            label="Network"
+            :options="networkOptions"
+          />
+          <BaseInput
+            v-model="form.flow"
+            label="Flow"
+            placeholder="xtls-rprx-vision"
+          />
+        </div>
+        
+        <!-- TLS Section -->
+        <fieldset class="border border-gray-200 rounded-lg p-4 mt-4">
+          <legend class="text-sm font-medium text-gray-700 px-2">TLS Settings</legend>
+          
+          <BaseToggle
+            v-model="form.tls.enabled"
+            label="Enable TLS"
+          />
+          
+          <template v-if="form.tls.enabled">
+            <BaseToggle
+              v-model="form.tls.insecure"
+              label="Skip Certificate Verification"
+            />
+            
+            <BaseInput
+              v-model="form.tls.server_name"
+              label="Server Name"
+              placeholder="example.com"
+            />
+            
+            <!-- uTLS Section -->
+            <fieldset class="border border-gray-200 rounded-lg p-4 mt-4">
+              <legend class="text-sm font-medium text-gray-700 px-2">uTLS</legend>
+              
+              <BaseToggle
+                v-model="form.tls.utls.enabled"
+                label="Enable uTLS"
+              />
+              
+              <BaseSelect
+                v-if="form.tls.utls.enabled"
+                v-model="form.tls.utls.fingerprint"
+                label="Fingerprint"
+                :options="fingerprintOptions"
+              />
+            </fieldset>
+            
+            <!-- Reality Section -->
+            <fieldset class="border border-gray-200 rounded-lg p-4 mt-4">
+              <legend class="text-sm font-medium text-gray-700 px-2">Reality</legend>
+              
+              <BaseToggle
+                v-model="form.tls.reality.enabled"
+                label="Enable Reality"
+              />
+              
+              <template v-if="form.tls.reality.enabled">
+                <BaseInput
+                  v-model="form.tls.reality.public_key"
+                  label="Public Key"
+                  required
+                />
+                <BaseInput
+                  v-model="form.tls.reality.short_id"
+                  label="Short ID"
+                />
+              </template>
+            </fieldset>
+          </template>
+        </fieldset>
+      </template>
+      
+      <!-- Direct/Block - minimal fields -->
+      <template v-if="form.type === 'direct' || form.type === 'block'">
+        <p class="text-sm text-gray-600">
+          {{ form.type === 'direct' ? 'Direct connection without proxy' : 'Block all traffic' }}
+        </p>
+      </template>
+      
+      <!-- Common fields -->
+      <BaseInput
+        v-model.number="form.routing_mark"
+        label="Routing Mark"
+        type="number"
+        placeholder="255"
+      />
+    </form>
+  </BaseModal>
+</template>
+
+<script setup>
+import { ref, watch } from 'vue'
+import BaseModal from '../ui/BaseModal.vue'
+import BaseInput from '../ui/BaseInput.vue'
+import BaseSelect from '../ui/BaseSelect.vue'
+import BaseToggle from '../ui/BaseToggle.vue'
+
+const props = defineProps({
+  show: Boolean,
+  item: Object,
+  mode: String
+})
+
+const emit = defineEmits(['close', 'save'])
+
+const loading = ref(false)
+
+const typeOptions = [
+  { value: 'shadowsocks', label: 'Shadowsocks' },
+  { value: 'vless', label: 'VLESS' },
+  { value: 'direct', label: 'Direct' },
+  { value: 'block', label: 'Block' }
+]
+
+const shadowsocksMethodOptions = [
+  { value: 'chacha20-ietf-poly1305', label: 'ChaCha20-IETF-Poly1305' },
+  { value: 'aes-256-gcm', label: 'AES-256-GCM' },
+  { value: 'aes-128-gcm', label: 'AES-128-GCM' }
+]
+
+const networkOptions = [
+  { value: 'tcp', label: 'TCP' },
+  { value: 'udp', label: 'UDP' }
+]
+
+const fingerprintOptions = [
+  { value: 'chrome', label: 'Chrome' },
+  { value: 'firefox', label: 'Firefox' },
+  { value: 'safari', label: 'Safari' },
+  { value: 'edge', label: 'Edge' }
+]
+
+const defaultForm = {
+  type: 'shadowsocks',
+  tag: '',
+  server: '',
+  server_port: 443,
+  method: 'chacha20-ietf-poly1305',
+  password: '',
+  network: 'tcp',
+  uuid: '',
+  flow: '',
+  routing_mark: 255,
+  tls: {
+    enabled: false,
+    insecure: false,
+    server_name: '',
+    utls: {
+      enabled: false,
+      fingerprint: 'chrome'
+    },
+    reality: {
+      enabled: false,
+      public_key: '',
+      short_id: ''
+    }
+  }
+}
+
+const form = ref({ ...defaultForm })
+
+watch(() => props.item, (newItem) => {
+  if (newItem) {
+    form.value = {
+      ...defaultForm,
+      ...newItem,
+      tls: {
+        ...defaultForm.tls,
+        ...newItem.tls,
+        utls: {
+          ...defaultForm.tls.utls,
+          ...newItem.tls?.utls
+        },
+        reality: {
+          ...defaultForm.tls.reality,
+          ...newItem.tls?.reality
+        }
+      }
+    }
+  } else {
+    form.value = { ...defaultForm }
+  }
+}, { immediate: true })
+
+async function handleSave() {
+  loading.value = true
+  
+  const cleanedForm = { ...form.value }
+  
+  if (cleanedForm.type === 'direct' || cleanedForm.type === 'block') {
+    delete cleanedForm.server
+    delete cleanedForm.server_port
+    delete cleanedForm.method
+    delete cleanedForm.password
+    delete cleanedForm.uuid
+    delete cleanedForm.flow
+    delete cleanedForm.tls
+  } else if (cleanedForm.type === 'shadowsocks') {
+    delete cleanedForm.uuid
+    delete cleanedForm.flow
+    delete cleanedForm.tls
+  } else if (cleanedForm.type === 'vless') {
+    delete cleanedForm.method
+    delete cleanedForm.password
+    
+    if (!cleanedForm.tls.enabled) {
+      delete cleanedForm.tls
+    } else {
+      if (!cleanedForm.tls.utls.enabled) {
+        delete cleanedForm.tls.utls
+      }
+      if (!cleanedForm.tls.reality.enabled) {
+        delete cleanedForm.tls.reality
+      }
+    }
+  }
+  
+  try {
+    emit('save', cleanedForm)
+  } finally {
+    loading.value = false
+  }
+}
+</script>
+
+=== FILE: src\components\modals\RouteRuleEditModal.vue ===
+<template>
+  <BaseModal
+    :show="show"
+    :title="mode === 'create' ? 'Add Route Rule' : 'Edit Route Rule'"
+    :loading="loading"
+    @close="$emit('close')"
+    @confirm="handleSave"
+  >
+    <form @submit.prevent="handleSave">
+      <BaseSelect
+        v-model="form.outbound"
+        label="Outbound"
+        :options="outboundOptions"
+        required
+        hint="Traffic matching this rule will use this outbound"
+      />
+      
+      <fieldset class="border border-gray-200 rounded-lg p-4 mt-4">
+        <legend class="text-sm font-medium text-gray-700 px-2">Match Conditions</legend>
+        <p class="text-sm text-gray-500 mb-4">Add at least one condition</p>
+        
+        <ArrayField
+          v-model="form.source_ip_cidr"
+          label="Source IP CIDR"
+          placeholder="192.168.1.0/24"
+          item-name="IP/CIDR"
+          hint="Match source IP addresses"
+        />
+        
+        <ArrayField
+          v-model="form.ip_cidr"
+          label="Destination IP CIDR"
+          placeholder="160.79.104.0/23"
+          item-name="IP/CIDR"
+          hint="Match destination IP addresses"
+        />
+        
+        <ArrayField
+          v-model="form.domain_suffix"
+          label="Domain Suffix"
+          placeholder="example.com"
+          item-name="domain"
+          hint="Match domain suffixes"
+        />
+        
+        <BaseSelect
+          v-if="ruleSetOptions.length > 0"
+          v-model="form.rule_set"
+          label="Rule Set"
+          :options="ruleSetOptions"
+          placeholder="Select a rule set"
+          hint="Use predefined rule set"
+        />
+      </fieldset>
+    </form>
+  </BaseModal>
+</template>
+
+<script setup>
+import { ref, computed, watch } from 'vue'
+import BaseModal from '../ui/BaseModal.vue'
+import BaseSelect from '../ui/BaseSelect.vue'
+import ArrayField from '../ui/ArrayField.vue'
+
+const props = defineProps({
+  show: Boolean,
+  item: Object,
+  mode: String,
+  outbounds: {
+    type: Array,
+    default: () => []
+  },
+  ruleSets: {
+    type: Array,
+    default: () => []
+  }
+})
+
+const emit = defineEmits(['close', 'save'])
+
+const loading = ref(false)
+
+const outboundOptions = computed(() =>
+  props.outbounds
+    .filter(o => !o._disabled && o.tag)
+    .map(o => ({ value: o.tag, label: `${o.tag} (${o.type})` }))
+)
+
+const ruleSetOptions = computed(() => [
+  { value: '', label: 'None' },
+  ...props.ruleSets
+    .filter(rs => !rs._disabled && rs.tag)
+    .map(rs => ({ value: rs.tag, label: rs.tag }))
+])
+
+const defaultForm = {
+  outbound: '',
+  source_ip_cidr: [],
+  ip_cidr: [],
+  domain_suffix: [],
+  rule_set: ''
+}
+
+const form = ref({ ...defaultForm })
+
+watch(() => props.item, (newItem) => {
+  if (newItem) {
+    form.value = {
+      ...defaultForm,
+      ...newItem,
+      source_ip_cidr: newItem.source_ip_cidr || [],
+      ip_cidr: newItem.ip_cidr || [],
+      domain_suffix: newItem.domain_suffix || []
+    }
+  } else {
+    form.value = { ...defaultForm }
+  }
+}, { immediate: true })
+
+async function handleSave() {
+  loading.value = true
+  
+  try {
+    const cleanedForm = { ...form.value }
+    
+    if (!cleanedForm.source_ip_cidr?.length) delete cleanedForm.source_ip_cidr
+    if (!cleanedForm.ip_cidr?.length) delete cleanedForm.ip_cidr
+    if (!cleanedForm.domain_suffix?.length) delete cleanedForm.domain_suffix
+    if (!cleanedForm.rule_set) delete cleanedForm.rule_set
+    
+    emit('save', cleanedForm)
+  } finally {
+    loading.value = false
+  }
+}
+</script>
+
+=== FILE: src\components\modals\RuleSetEditModal.vue ===
+<template>
+  <BaseModal
+    :show="show"
+    :title="mode === 'create' ? 'Add Rule Set' : 'Edit Rule Set'"
+    :loading="loading"
+    @close="$emit('close')"
+    @confirm="handleSave"
+  >
+    <form @submit.prevent="handleSave">
+      <BaseInput
+        v-model="form.tag"
+        label="Tag"
+        placeholder="openai"
+        required
+        hint="Unique identifier for this rule set"
+      />
+      
+      <BaseSelect
+        v-model="form.type"
+        label="Type"
+        :options="typeOptions"
+        required
+      />
+      
+      <BaseSelect
+        v-model="form.format"
+        label="Format"
+        :options="formatOptions"
+        required
+      />
+      
+      <BaseInput
+        v-model="form.url"
+        label="URL"
+        placeholder="https://example.com/rules.srs"
+        required
+        hint="Remote URL to fetch the rule set"
+      />
+    </form>
+  </BaseModal>
+</template>
+
+<script setup>
+import { ref, watch } from 'vue'
+import BaseModal from '../ui/BaseModal.vue'
+import BaseInput from '../ui/BaseInput.vue'
+import BaseSelect from '../ui/BaseSelect.vue'
+
+const props = defineProps({
+  show: Boolean,
+  item: Object,
+  mode: String
+})
+
+const emit = defineEmits(['close', 'save'])
+
+const loading = ref(false)
+
+const typeOptions = [
+  { value: 'remote', label: 'Remote' },
+  { value: 'local', label: 'Local' }
+]
+
+const formatOptions = [
+  { value: 'binary', label: 'Binary' },
+  { value: 'source', label: 'Source' }
+]
+
+const defaultForm = {
+  tag: '',
+  type: 'remote',
+  format: 'binary',
+  url: ''
+}
+
+const form = ref({ ...defaultForm })
+
+watch(() => props.item, (newItem) => {
+  if (newItem) {
+    form.value = { ...defaultForm, ...newItem }
+  } else {
+    form.value = { ...defaultForm }
+  }
+}, { immediate: true })
+
+async function handleSave() {
+  loading.value = true
+  
+  try {
+    emit('save', { ...form.value })
+  } finally {
+    loading.value = false
+  }
+}
+</script>
+
+=== FILE: src\components\ui\ArrayField.vue ===
+<template>
+  <div class="form-group">
+    <label v-if="label" class="label-text">{{ label }}</label>
+    
+    <div class="space-y-2">
+      <div 
+        v-for="(item, index) in items" 
+        :key="index"
+        class="flex gap-2"
+      >
+        <input
+          :value="item"
+          :placeholder="placeholder"
+          class="input-field"
+          @input="updateItem(index, $event.target.value)"
+        />
+        <BaseButton variant="icon" @click="removeItem(index)">
+          🗑️
+        </BaseButton>
+      </div>
+      
+      <BaseButton variant="secondary" @click="addItem">
+        + Add {{ itemName }}
+      </BaseButton>
+    </div>
+    
+    <p v-if="hint" class="mt-1 text-sm text-gray-500">{{ hint }}</p>
+  </div>
+</template>
+
+<script setup>
+import { computed } from 'vue'
+import BaseButton from './BaseButton.vue'
+
+const props = defineProps({
+  modelValue: {
+    type: Array,
+    default: () => []
+  },
+  label: String,
+  placeholder: String,
+  itemName: {
+    type: String,
+    default: 'item'
+  },
+  hint: String
+})
+
+const emit = defineEmits(['update:modelValue'])
+
+const items = computed(() => props.modelValue || [])
+
+function addItem() {
+  emit('update:modelValue', [...items.value, ''])
+}
+
+function updateItem(index, value) {
+  const newItems = [...items.value]
+  newItems[index] = value
+  emit('update:modelValue', newItems)
+}
+
+function removeItem(index) {
+  const newItems = items.value.filter((_, i) => i !== index)
+  emit('update:modelValue', newItems)
+}
+</script>
+
+=== FILE: src\components\ui\BaseButton.vue ===
+<template>
+  <button
+    :type="type"
+    :disabled="disabled || loading"
+    :class="buttonClass"
+    @click="$emit('click', $event)"
+  >
+    <span v-if="loading" class="inline-block animate-spin mr-2">⏳</span>
+    <slot />
+  </button>
+</template>
+
+<script setup>
+import { computed } from 'vue'
+
+const props = defineProps({
+  variant: {
+    type: String,
+    default: 'primary',
+    validator: (value) => ['primary', 'secondary', 'danger', 'icon'].includes(value)
+  },
+  type: {
+    type: String,
+    default: 'button'
+  },
+  disabled: Boolean,
+  loading: Boolean
+})
+
+defineEmits(['click'])
+
+const buttonClass = computed(() => {
+  const variants = {
+    primary: 'btn-primary',
+    secondary: 'btn-secondary',
+    danger: 'btn-danger',
+    icon: 'btn-icon'
+  }
+  return variants[props.variant] || variants.primary
+})
+</script>
+
+=== FILE: src\components\ui\BaseCard.vue ===
+<template>
+  <div :class="['card-compact', { 'card-disabled': disabled }]" :style="disabled ? 'opacity: 0.5; pointer-events: none;' : ''">
+    <div class="card-header" v-if="$slots.header || title">
+      <div>
+        <h3 v-if="title" class="card-title">{{ title }}</h3>
+        <slot name="header" />
+      </div>
+      <div class="flex items-center gap-2">
+        <slot name="headerActions" />
+      </div>
+    </div>
+    
+    <div class="card-body">
+      <slot />
+    </div>
+    
+    <div v-if="$slots.actions" class="card-actions">
+      <slot name="actions" />
+    </div>
+  </div>
+</template>
+
+<script setup>
+defineProps({
+  title: String,
+  disabled: Boolean
+})
+</script>
+
+=== FILE: src\components\ui\BaseInput.vue ===
+<template>
+  <div class="form-group">
+    <label v-if="label" :for="id" :class="['label-text', { 'label-required': required }]">
+      {{ label }}
+    </label>
+    <input
+      :id="id"
+      :type="type"
+      :value="modelValue"
+      :placeholder="placeholder"
+      :required="required"
+      :disabled="disabled"
+      :class="['input-field', { 'input-error': error }]"
+      @input="$emit('update:modelValue', $event.target.value)"
+    />
+    <p v-if="error" class="mt-1 text-sm text-red-600">{{ error }}</p>
+    <p v-else-if="hint" class="mt-1 text-sm text-gray-500">{{ hint }}</p>
+  </div>
+</template>
+
+<script setup>
+import { computed } from 'vue'
+
+const props = defineProps({
+  modelValue: [String, Number],
+  label: String,
+  type: {
+    type: String,
+    default: 'text'
+  },
+  placeholder: String,
+  required: Boolean,
+  disabled: Boolean,
+  error: String,
+  hint: String
+})
+
+defineEmits(['update:modelValue'])
+
+const id = computed(() => `input-${Math.random().toString(36).substr(2, 9)}`)
+</script>
+
+=== FILE: src\components\ui\BaseModal.vue ===
+<template>
+  <Teleport to="body">
+    <Transition name="modal">
+      <div v-if="show" class="modal-overlay" @click.self="handleClose">
+        <div class="modal-content" @click.stop>
+          <div class="modal-header">
+            <h2 class="modal-title">{{ title }}</h2>
+            <button 
+              class="btn-icon text-gray-400 hover:text-gray-600"
+              @click="handleClose"
+            >
+              ✕
+            </button>
+          </div>
+          
+          <div class="modal-body">
+            <slot />
+          </div>
+          
+          <div class="modal-footer">
+            <BaseButton variant="secondary" @click="handleClose">
+              {{ cancelText }}
+            </BaseButton>
+            <BaseButton 
+              :loading="loading"
+              @click="$emit('confirm')"
+            >
+              {{ confirmText }}
+            </BaseButton>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
+</template>
+
+<script setup>
+import BaseButton from './BaseButton.vue'
+
+defineProps({
+  show: Boolean,
+  title: String,
+  confirmText: {
+    type: String,
+    default: 'Save'
+  },
+  cancelText: {
+    type: String,
+    default: 'Cancel'
+  },
+  loading: Boolean,
+  closeOnEscape: {
+    type: Boolean,
+    default: true
+  }
+})
+
+const emit = defineEmits(['close', 'confirm'])
+
+function handleClose() {
+  emit('close')
+}
+</script>
+
+<style scoped>
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
+
+.modal-enter-active .modal-content,
+.modal-leave-active .modal-content {
+  transition: transform 0.2s ease;
+}
+
+.modal-enter-from .modal-content,
+.modal-leave-to .modal-content {
+  transform: scale(0.95);
+}
+</style>
+
+=== FILE: src\components\ui\BaseSelect.vue ===
+<template>
+  <div class="form-group">
+    <label v-if="label" :for="id" :class="['label-text', { 'label-required': required }]">
+      {{ label }}
+    </label>
+    <select
+      :id="id"
+      :value="modelValue"
+      :required="required"
+      :disabled="disabled"
+      :class="['input-field', { 'input-error': error }]"
+      @change="$emit('update:modelValue', $event.target.value)"
+    >
+      <option v-if="placeholder" value="" disabled>{{ placeholder }}</option>
+      <option 
+        v-for="option in options" 
+        :key="option.value" 
+        :value="option.value"
+      >
+        {{ option.label }}
+      </option>
+    </select>
+    <p v-if="error" class="mt-1 text-sm text-red-600">{{ error }}</p>
+    <p v-else-if="hint" class="mt-1 text-sm text-gray-500">{{ hint }}</p>
+  </div>
+</template>
+
+<script setup>
+import { computed } from 'vue'
+
+const props = defineProps({
+  modelValue: [String, Number],
+  label: String,
+  options: {
+    type: Array,
+    required: true,
+    validator: (options) => options.every(opt => 'value' in opt && 'label' in opt)
+  },
+  placeholder: String,
+  required: Boolean,
+  disabled: Boolean,
+  error: String,
+  hint: String
+})
+
+defineEmits(['update:modelValue'])
+
+const id = computed(() => `select-${Math.random().toString(36).substr(2, 9)}`)
+</script>
+
+=== FILE: src\components\ui\BaseToggle.vue ===
+<template>
+  <div class="flex items-center gap-3">
+    <label v-if="label" class="label-text">{{ label }}</label>
+    <div class="toggle-wrapper">
+      <input
+        type="checkbox"
+        class="toggle-input"
+        :checked="modelValue"
+        :disabled="disabled"
+        @change="$emit('update:modelValue', $event.target.checked)"
+      />
+      <span class="toggle-slider"></span>
+    </div>
+  </div>
+</template>
+
+<script setup>
+defineProps({
+  modelValue: Boolean,
+  label: String,
+  disabled: Boolean
+})
+
+defineEmits(['update:modelValue'])
+</script>
+
+=== FILE: src\composables\useConfigList.js ===
+import { ref, computed } from 'vue'
+import { createNewItem } from '../services/ConfigNormalizer'
+
+/**
+ * Composable для управления списком элементов конфигурации
+ */
+export function useConfigList(initialItems = []) {
+  const items = ref([...initialItems])
+  
+  const activeItems = computed(() => 
+    items.value.filter(item => !item._disabled)
+  )
+  
+  const disabledItems = computed(() => 
+    items.value.filter(item => item._disabled)
+  )
+  
+  function addItem(newItem) {
+    const item = createNewItem(newItem)
+    items.value.push(item)
+    return item
+  }
+  
+  function updateItem(id, updates) {
+    const index = items.value.findIndex(item => item._id === id)
+    if (index !== -1) {
+      items.value[index] = { ...items.value[index], ...updates }
+    }
+  }
+  
+  function deleteItem(id) {
+    const index = items.value.findIndex(item => item._id === id)
+    if (index !== -1) {
+      items.value.splice(index, 1)
+    }
+  }
+  
+  function toggleDisable(id) {
+    const index = items.value.findIndex(item => item._id === id)
+    if (index !== -1) {
+      // Создаем новый объект для реактивности Vue
+      items.value[index] = {
+        ...items.value[index],
+        _disabled: !items.value[index]._disabled
+      }
+    }
+  }
+  
+  function moveItem(id, direction) {
+    const index = items.value.findIndex(item => item._id === id)
+    if (index === -1) return
+    
+    const newIndex = direction === 'up' ? index - 1 : index + 1
+    if (newIndex < 0 || newIndex >= items.value.length) return
+    
+    const temp = items.value[index]
+    items.value[index] = items.value[newIndex]
+    items.value[newIndex] = temp
+  }
+  
+  function getItemById(id) {
+    return items.value.find(item => item._id === id)
+  }
+  
+  return {
+    items,
+    activeItems,
+    disabledItems,
+    addItem,
+    updateItem,
+    deleteItem,
+    toggleDisable,
+    moveItem,
+    getItemById
+  }
+}
+
+=== FILE: src\composables\useModal.js ===
+import { ref } from 'vue'
+
+/**
+ * Composable для управления состоянием модального окна
+ */
+export function useModal() {
+  const isOpen = ref(false)
+  const currentItem = ref(null)
+  const mode = ref('create') // 'create' | 'edit'
+  
+  function openModal(item = null) {
+    if (item) {
+      mode.value = 'edit'
+      currentItem.value = { ...item }
+    } else {
+      mode.value = 'create'
+      currentItem.value = null
+    }
+    isOpen.value = true
+  }
+  
+  function closeModal() {
+    isOpen.value = false
+    currentItem.value = null
+  }
+  
+  return {
+    isOpen,
+    currentItem,
+    mode,
+    openModal,
+    closeModal
+  }
+}
+
+=== FILE: src\services\ConfigNormalizer.js ===
+import { v4 as uuidv4 } from 'uuid'
+
+/**
+ * Генерирует уникальный ID
+ */
+function generateId() {
+  return uuidv4()
+}
+
+/**
+ * Проверяет, является ли поле служебным (начинается с _)
+ */
+function isInternalField(key) {
+  return key.startsWith('_')
+}
+
+/**
+ * Рекурсивно удаляет все служебные поля из объекта
+ */
+function removeInternalFields(obj) {
+  if (Array.isArray(obj)) {
+    return obj
+      .filter(item => !item._disabled) // Удаляем отключенные элементы
+      .map(item => removeInternalFields(item))
+  }
+  
+  if (obj !== null && typeof obj === 'object') {
+    const cleaned = {}
+    for (const [key, value] of Object.entries(obj)) {
+      if (!isInternalField(key)) {
+        cleaned[key] = removeInternalFields(value)
+      }
+    }
+    return cleaned
+  }
+  
+  return obj
+}
+
+/**
+ * Добавляет служебные поля к элементу массива
+ */
+function normalizeItem(item, index) {
+  return {
+    ...item,
+    _id: item.tag || item._id || generateId(),
+    _order: index,
+    _disabled: item._disabled ?? false
+  }
+}
+
+/**
+ * Нормализует конфигурацию sing-box, добавляя служебные поля
+ */
+export function normalize(config) {
+  if (!config) {
+    // Возвращаем пустой конфиг если данных нет
+    return {
+      log: { level: 'info' },
+      dns: {
+        servers: [],
+        strategy: 'prefer_ipv4',
+        final: 'google',
+        disable_cache: false,
+        disable_expire: false
+      },
+      inbounds: [],
+      outbounds: [],
+      route: {
+        rules: [],
+        rule_set: [],
+        auto_detect_interface: true,
+        final: 'direct'
+      }
+    }
+  }
+  
+  return {
+    log: config.log || { level: 'info' },
+    
+    dns: {
+      servers: ((config.dns && config.dns.servers) || []).map(normalizeItem),
+      strategy: (config.dns && config.dns.strategy) || 'prefer_ipv4',
+      final: (config.dns && config.dns.final) || 'google',
+      disable_cache: (config.dns && config.dns.disable_cache) ?? false,
+      disable_expire: (config.dns && config.dns.disable_expire) ?? false
+    },
+    
+    inbounds: (config.inbounds || []).map(normalizeItem),
+    
+    outbounds: (config.outbounds || []).map(normalizeItem),
+    
+    route: {
+      rules: ((config.route && config.route.rules) || []).map(normalizeItem),
+      rule_set: ((config.route && config.route.rule_set) || []).map(normalizeItem),
+      auto_detect_interface: (config.route && config.route.auto_detect_interface) ?? true,
+      final: (config.route && config.route.final) || 'direct'
+    }
+  }
+}
+
+/**
+ * Очищает конфигурацию от служебных полей перед сохранением
+ */
+export function sanitize(config) {
+  if (!config) return null
+  
+  return removeInternalFields(config)
+}
+
+/**
+ * Создает новый элемент с служебными полями
+ */
+export function createNewItem(baseItem = {}) {
+  return {
+    ...baseItem,
+    _id: generateId(),
+    _disabled: false
+  }
+}
+
+=== FILE: src\services\ConfigService.js ===
+import axios from 'axios'
+import { normalize, sanitize } from './ConfigNormalizer'
+
+const API_URL = '/cgi-bin/api.uc?file=/etc/sing-box/config.json'
+
+export default {
+  async loadConfig() {
+    try {
+      const response = await axios.get(API_URL)
+      return normalize(response.data)
+    } catch (error) {
+      console.error('Failed to load config:', error)
+      throw error
+    }
+  },
+
+  async saveConfig(config) {
+    try {
+      const sanitized = sanitize(config)
+      await axios.post(API_URL, sanitized)
+    } catch (error) {
+      console.error('Failed to save config:', error)
+      throw error
+    }
+  }
+}
+
+=== FILE: src\services\MetadataService.js ===
+export class MetadataService {
+  constructor() {
+    this.storageKey = 'sing-box-metadata'
+  }
+  
+  // Generate hash for config identification
+  getConfigHash(config) {
+    const str = JSON.stringify({
+      dns: config.dns,
+      inbounds: config.inbounds?.map(i => i.tag),
+      outbounds: config.outbounds?.map(o => o.tag)
+    })
+    return btoa(str).substring(0, 16)
+  }
+  
+  // Generate stable ID for rule
+  getRuleId(rule, index) {
+    const content = JSON.stringify({
+      outbound: rule.outbound,
+      rule_set: rule.rule_set,
+      domain: rule.domain_suffix?.[0],
+      index: index
+    })
+    return `rule-${btoa(content).substring(0, 12)}`
+  }
+  
+  // Load metadata for current config
+  load(config) {
+    const hash = this.getConfigHash(config)
+    const stored = localStorage.getItem(this.storageKey)
+    
+    if (stored) {
+      try {
+        const allMetadata = JSON.parse(stored)
+        return allMetadata[hash] || this.getDefault()
+      } catch (e) {
+        console.error('Failed to parse metadata:', e)
+        return this.getDefault()
+      }
+    }
+    
+    return this.getDefault()
+  }
+  
+  // Save metadata
+  save(config, metadata) {
+    const hash = this.getConfigHash(config)
+    const stored = localStorage.getItem(this.storageKey)
+    const allMetadata = stored ? JSON.parse(stored) : {}
+    
+    allMetadata[hash] = {
+      ...metadata,
+      lastUpdated: new Date().toISOString()
+    }
+    
+    localStorage.setItem(this.storageKey, JSON.stringify(allMetadata))
+  }
+  
+  // Default metadata structure
+  getDefault() {
+    return {
+      disabledRules: [],
+      ruleViewMode: 'compact',
+      groups: [],
+      lastUpdated: new Date().toISOString()
+    }
+  }
+}
