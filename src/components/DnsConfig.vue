@@ -129,7 +129,7 @@ const strategyOptions = [
 
 const dnsSettings = computed(() => ({
   strategy: props.modelValue.strategy || 'prefer_ipv4',
-  final: props.modelValue.final || 'google',
+  final: props.modelValue.final,
   disable_cache: props.modelValue.disable_cache ?? false,
   disable_expire: props.modelValue.disable_expire ?? false
 }))

@@ -139,7 +139,7 @@ const modal = useModal()
 const allItems = computed(() => list.items.value)
 const routeSettings = computed(() => ({
   auto_detect_interface: props.modelValue.auto_detect_interface ?? true,
-  final: props.modelValue.final || 'direct'
+  final: props.modelValue.final
 }))
 
 function getRuleSummary(item) {
